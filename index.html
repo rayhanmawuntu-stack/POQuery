@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Import an Excel purchase order report and find complete PO details instantly." />
+  <meta name="theme-color" content="#0b1220" />
+  <title>PO Query</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="PO Query home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M7 3h8l4 4v14H7z" />
+            <path d="M15 3v5h5M10 12h6M10 16h6" />
+          </svg>
+        </span>
+        <span>
+          <strong>PO Query</strong>
+          <small>Purchase order lookup</small>
+        </span>
+      </a>
+      <div class="privacy-pill">
+        <span class="privacy-dot"></span>
+        Local processing only
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">FAST EXCEL SEARCH</span>
+          <h1>Find every purchase order detail in seconds.</h1>
+          <p>Import your Excel report, search a PO number, and review supplier, item, price, description, TOP, and goods-receipt information.</p>
+        </div>
+
+        <div id="uploadPanel" class="upload-card">
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
+          <div class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" />
+            </svg>
+          </div>
+          <div>
+            <h2>Import PO data</h2>
+            <p>Drop an Excel file here or choose it from your device.</p>
+          </div>
+          <button id="chooseFileButton" class="button button-primary" type="button">Choose Excel file</button>
+          <p class="upload-note">Supported: XLSX, XLS, XLSM, CSV · The file never leaves your browser.</p>
+        </div>
+      </section>
+
+      <section id="workspace" class="workspace" hidden>
+        <div class="data-toolbar">
+          <div class="file-status">
+            <span class="file-status-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6zM14 2v5h5M9 12h6M9 16h6" /></svg>
+            </span>
+            <div>
+              <strong id="fileName">Workbook.xlsx</strong>
+              <span id="fileMeta">0 rows · 0 purchase orders</span>
+            </div>
+          </div>
+          <button id="changeFileButton" class="button button-secondary" type="button">Change file</button>
+        </div>
+
+        <section class="search-panel" aria-labelledby="searchTitle">
+          <div class="search-heading">
+            <div>
+              <span class="eyebrow">PO LOOKUP</span>
+              <h2 id="searchTitle">Search by PO number</h2>
+            </div>
+            <span id="sheetBadge" class="sheet-badge"></span>
+          </div>
+
+          <form id="searchForm" class="search-form" autocomplete="off">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m16.5 16.5 4 4" /></svg>
+              <input id="poSearch" type="search" inputmode="numeric" placeholder="Enter a PO number, e.g. 431056722" aria-label="Purchase order number" />
+              <button id="clearSearchButton" class="clear-button" type="button" aria-label="Clear search" hidden>×</button>
+            </div>
+            <button class="button button-primary search-button" type="submit">Search PO</button>
+          </form>
+          <div id="suggestions" class="suggestions" hidden></div>
+          <p id="searchHint" class="search-hint">Start typing a PO number to see matching records.</p>
+        </section>
+
+        <section id="resultArea" class="result-area" aria-live="polite">
+          <div id="welcomeState" class="empty-state">
+            <span class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" /></svg>
+            </span>
+            <h3>Your PO details will appear here</h3>
+            <p>Search using the exact PO number or select one of the suggested matches.</p>
+          </div>
+
+          <div id="noResultState" class="empty-state" hidden>
+            <span class="empty-icon warning" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m16.5 16.5 4 4M9 9l4 4m0-4-4 4" /></svg>
+            </span>
+            <h3>No matching PO found</h3>
+            <p id="noResultMessage">Check the PO number and try again.</p>
+          </div>
+
+          <div id="poResult" hidden>
+            <div class="result-header">
+              <div>
+                <span class="result-kicker">PURCHASE ORDER</span>
+                <div class="result-title-row">
+                  <h2 id="resultPoNumber"></h2>
+                  <span id="resultStatus" class="status-badge"></span>
+                </div>
+                <p id="resultSupplier"></p>
+              </div>
+              <div class="result-actions">
+                <button id="copySummaryButton" class="button button-secondary" type="button">Copy summary</button>
+                <button id="printButton" class="button button-secondary" type="button">Print</button>
+              </div>
+            </div>
+
+            <div id="summaryGrid" class="summary-grid"></div>
+
+            <div id="topNotice" class="notice" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+              <div>
+                <strong>TOP was not found in this workbook</strong>
+                <p>Add a column named TOP, Payment Terms, Terms of Payment, or Payment Term and it will be displayed automatically.</p>
+              </div>
+            </div>
+
+            <section class="items-section" aria-labelledby="itemsTitle">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">LINE ITEMS</span>
+                  <h3 id="itemsTitle">Items in this PO</h3>
+                </div>
+                <span id="itemCountBadge" class="count-badge"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item code</th>
+                      <th>Description</th>
+                      <th class="number-cell">Quantity</th>
+                      <th class="number-cell">Unit price</th>
+                      <th class="number-cell">Line total</th>
+                      <th>Goods receipt</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="itemsTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section id="detectedColumnsSection" class="detected-section">
+              <details>
+                <summary>Detected workbook columns</summary>
+                <div id="detectedColumns" class="detected-columns"></div>
+              </details>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <p>PO Query · Excel data is processed locally and is not stored.</p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
