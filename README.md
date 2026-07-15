@@ -12,6 +12,7 @@ A fast, browser-based purchase order lookup tool. Import an Excel report and sea
 - Automatically detects common column-name variations.
 - Responsive layout for desktop and mobile.
 - Printable result view and copyable PO summary.
+- Automatically deploys to GitHub Pages through GitHub Actions after updates to `main`.
 
 ## Expected columns
 
@@ -42,15 +43,13 @@ python -m http.server 8000
 
 Then open `http://localhost:8000`.
 
-## GitHub Pages
+## GitHub Pages deployment
 
-1. Open the repository **Settings**.
-2. Go to **Pages**.
-3. Under **Build and deployment**, select **Deploy from a branch**.
-4. Choose the `main` branch and `/ (root)` folder.
-5. Save.
+The workflow at `.github/workflows/deploy-pages.yml` deploys the static app whenever a commit is pushed to `main`. It can also be run manually from the repository's **Actions** tab.
 
-The site will be available at the GitHub Pages URL shown in the Pages settings.
+For the first deployment, open **Settings → Pages** and make sure **Source** is set to **GitHub Actions**. The deployed site URL is:
+
+`https://rayhanmawuntu-stack.github.io/POQuery/`
 
 ## Privacy
 
