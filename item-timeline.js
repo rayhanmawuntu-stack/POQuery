@@ -1,0 +1,236 @@
+(() => {
+  "use strict";
+
+  const tableBody = document.getElementById("itemsTableBody");
+  const table = tableBody?.closest("table");
+  const headerRow = table?.querySelector("thead tr");
+  const summaryGrid = document.getElementById("summaryGrid");
+  if (!tableBody || !table || !headerRow || !summaryGrid) return;
+
+  const nextFrame = window.requestAnimationFrame?.bind(window) || ((callback) => window.setTimeout(callback, 0));
+
+  const style = document.createElement("style");
+  style.id = "item-timeline-styles";
+  style.textContent = `
+    [data-column="item-timeline"], .item-timeline-cell { min-width: 255px; }
+    .item-timeline-cell { white-space: normal; }
+    .item-timeline {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 3px;
+      min-width: 220px;
+      font-variant-numeric: tabular-nums;
+    }
+    .timeline-event {
+      display: inline-grid;
+      grid-template-columns: 7px auto;
+      align-items: center;
+      gap: 4px;
+      min-height: 25px;
+      padding: 2px 5px;
+      border: 1px solid #9a9a94;
+      background: #f8f8f4;
+      color: #1f1f1f;
+      line-height: 1.15;
+    }
+    .timeline-dot {
+      width: 7px;
+      height: 7px;
+      border: 1px solid #174b6b;
+      border-radius: 50%;
+      background: #d7eaf7;
+    }
+    .timeline-copy { display: grid; gap: 1px; }
+    .timeline-copy strong { font-size: 9px; font-weight: 700; color: #123e5d; white-space: nowrap; }
+    .timeline-copy small { font-size: 9px; color: #555; white-space: nowrap; }
+    .timeline-connector { color: #6f8798; font-size: 12px; font-weight: 700; }
+    .timeline-event.gr .timeline-dot { border-color: #256f3a; background: #dff2df; }
+    .timeline-event.cancelled { color: #8d0000; background: #ffe8e8; text-decoration: line-through; opacity: .78; }
+    .timeline-event.cancelled .timeline-dot { border-color: #8d0000; background: #ffcaca; }
+    .timeline-event.return .timeline-dot { border-color: #9a5200; background: #ffe5b8; }
+    .timeline-event.open .timeline-dot { border-color: #8d6b00; background: #fff0a6; }
+    .hide-item-timeline [data-column="item-timeline"],
+    .hide-item-timeline .item-timeline-cell { display: none !important; }
+    .hide-cancelled-gr .timeline-event.cancelled,
+    .hide-cancelled-gr .timeline-event.cancelled + .timeline-connector { display: none !important; }
+    .performance-mode .item-timeline-cell { contain: content; }
+    .performance-mode .timeline-event { box-shadow: none !important; transition: none !important; }
+    @media (max-width: 760px) {
+      [data-column="item-timeline"], .item-timeline-cell { min-width: 220px; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  function getPoDate() {
+    for (const card of summaryGrid.querySelectorAll(".summary-card")) {
+      const label = card.querySelector("span")?.textContent?.trim().toLowerCase();
+      if (label === "po date") return card.querySelector("strong")?.textContent?.trim() || "—";
+    }
+    return "—";
+  }
+
+  function ensureTimelineHeader() {
+    if (headerRow.querySelector('[data-column="item-timeline"]')) return true;
+    const grDateHeader = headerRow.querySelector('[data-column="gr-date"]');
+    if (!grDateHeader) return false;
+
+    const timelineHeader = document.createElement("th");
+    timelineHeader.dataset.column = "item-timeline";
+    timelineHeader.textContent = "Item Timeline";
+    grDateHeader.insertAdjacentElement("afterend", timelineHeader);
+    return true;
+  }
+
+  function parseReceiptChip(chip, dateChip) {
+    const raw = chip.textContent?.trim() || "—";
+    const separator = " · ";
+    const separatorIndex = raw.lastIndexOf(separator);
+    const fallbackNumber = separatorIndex >= 0 ? raw.slice(0, separatorIndex).trim() : raw;
+    const fallbackDate = separatorIndex >= 0 ? raw.slice(separatorIndex + separator.length).trim() : "—";
+
+    return {
+      number: chip.dataset.grNumber || fallbackNumber || "—",
+      date: chip.dataset.grDate || dateChip?.textContent?.trim() || fallbackDate || "—",
+      cancelled: chip.classList.contains("cancelled")
+    };
+  }
+
+  function createEvent(label, date, type, cancelled = false) {
+    const event = document.createElement("span");
+    event.className = `timeline-event ${type}${cancelled ? " cancelled" : ""}`;
+
+    const dot = document.createElement("span");
+    dot.className = "timeline-dot";
+    dot.setAttribute("aria-hidden", "true");
+
+    const copy = document.createElement("span");
+    copy.className = "timeline-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = label;
+
+    const dateText = document.createElement("small");
+    dateText.textContent = date || "—";
+
+    copy.append(title, dateText);
+    event.append(dot, copy);
+    return event;
+  }
+
+  function appendEvent(timeline, event) {
+    if (timeline.children.length) {
+      const connector = document.createElement("span");
+      connector.className = "timeline-connector";
+      connector.textContent = "›";
+      connector.setAttribute("aria-hidden", "true");
+      timeline.appendChild(connector);
+    }
+    timeline.appendChild(event);
+  }
+
+  function renderTimelineForRow(row, poDate) {
+    if (row.dataset.itemTimelineRendered === "true") return true;
+
+    const grDateCell = row.querySelector(":scope > .gr-date-cell");
+    if (!grDateCell) return false;
+
+    const cells = row.cells;
+    if (cells.length < 8) return false;
+
+    const receiptCell = cells[5];
+    const statusCell = cells[cells.length - 1];
+    const receiptChips = [...receiptCell.querySelectorAll(".gr-chip")];
+    const dateChips = [...grDateCell.querySelectorAll(".gr-chip")];
+
+    const timelineCell = document.createElement("td");
+    timelineCell.className = "item-timeline-cell";
+
+    const timeline = document.createElement("div");
+    timeline.className = "item-timeline";
+    timeline.setAttribute("aria-label", "Item document timeline");
+
+    appendEvent(timeline, createEvent("PO", poDate, "po"));
+
+    receiptChips.forEach((chip, index) => {
+      const receipt = parseReceiptChip(chip, dateChips[index]);
+      appendEvent(
+        timeline,
+        createEvent(`GR ${receipt.number}`, receipt.date, "gr", receipt.cancelled)
+      );
+    });
+
+    const statusText = statusCell.textContent?.trim().toLowerCase() || "";
+    if (statusText.includes("returned")) {
+      appendEvent(timeline, createEvent("Return", "Recorded", "return"));
+    } else if (!receiptChips.length) {
+      appendEvent(timeline, createEvent("Awaiting GR", "Open", "open"));
+    }
+
+    timelineCell.appendChild(timeline);
+    row.insertBefore(timelineCell, statusCell);
+    row.dataset.itemTimelineRendered = "true";
+    return true;
+  }
+
+  let renderQueued = false;
+  let retryTimer = 0;
+
+  function renderTimelines() {
+    renderQueued = false;
+    if (!ensureTimelineHeader()) {
+      window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(scheduleTimelineRender, 20);
+      return;
+    }
+
+    const poDate = getPoDate();
+    let pending = false;
+    for (const row of tableBody.rows) {
+      if (!renderTimelineForRow(row, poDate)) pending = true;
+    }
+
+    if (pending) {
+      window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(scheduleTimelineRender, 20);
+    }
+  }
+
+  function scheduleTimelineRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    nextFrame(renderTimelines);
+  }
+
+  const observer = new MutationObserver(scheduleTimelineRender);
+  observer.observe(tableBody, { childList: true, subtree: true });
+  scheduleTimelineRender();
+
+  function installTimelineControl() {
+    const controlOptions = document.querySelector("#controlTabPanel .control-options");
+    if (!controlOptions || controlOptions.querySelector("#showItemTimelineToggle")) return;
+
+    const option = document.createElement("label");
+    option.className = "control-option";
+    option.innerHTML = `
+      <input id="showItemTimelineToggle" type="checkbox" checked />
+      <strong>Show item timeline</strong>
+      <span>Shows the PO, every GR event, cancelled receipt, and return status for each line item.</span>
+    `;
+    controlOptions.appendChild(option);
+
+    const toggle = option.querySelector("#showItemTimelineToggle");
+    const apply = () => document.body.classList.toggle("hide-item-timeline", !toggle.checked);
+    toggle.addEventListener("change", apply);
+
+    const resetButton = document.getElementById("resetControlButton");
+    resetButton?.addEventListener("click", () => {
+      toggle.checked = true;
+      apply();
+    });
+
+    apply();
+  }
+
+  installTimelineControl();
+})();
