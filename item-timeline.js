@@ -1,8 +1,10 @@
 (() => {
   "use strict";
 
+  const root = document.documentElement;
   const tableBody = document.getElementById("itemsTableBody");
   const table = tableBody?.closest("table");
+  const tableWrap = table?.closest(".table-wrap");
   const headerRow = table?.querySelector("thead tr");
   const summaryGrid = document.getElementById("summaryGrid");
   if (!tableBody || !table || !headerRow || !summaryGrid) return;
@@ -12,6 +14,7 @@
   const style = document.createElement("style");
   style.id = "item-timeline-styles";
   style.textContent = `
+    html { scroll-padding-top: 10px; }
     [data-column="item-timeline"], .item-timeline-cell { min-width: 255px; }
     .item-timeline-cell { white-space: normal; }
     .item-timeline {
@@ -54,13 +57,129 @@
     .hide-item-timeline .item-timeline-cell { display: none !important; }
     .hide-cancelled-gr .timeline-event.cancelled,
     .hide-cancelled-gr .timeline-event.cancelled + .timeline-connector { display: none !important; }
+
+    .table-wrap {
+      scroll-behavior: smooth;
+      scroll-padding-top: 30px;
+      scrollbar-gutter: stable both-edges;
+      scrollbar-width: thin;
+      scrollbar-color: #7890a2 #e5e5df;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      overscroll-behavior-y: auto;
+      touch-action: pan-x pan-y;
+    }
+    .table-wrap::-webkit-scrollbar { width: 11px; height: 11px; }
+    .table-wrap::-webkit-scrollbar-track { background: #e5e5df; }
+    .table-wrap::-webkit-scrollbar-thumb {
+      min-height: 34px;
+      border: 2px solid #e5e5df;
+      border-radius: 8px;
+      background: #7890a2;
+    }
+    .table-wrap::-webkit-scrollbar-thumb:hover { background: #526f84; }
+    .sap-menu, .sap-toolbar, .sap-tabs {
+      scrollbar-width: thin;
+      scrollbar-color: #7890a2 #e5e5df;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .performance-mode .item-timeline-cell { contain: content; }
     .performance-mode .timeline-event { box-shadow: none !important; transition: none !important; }
+    .performance-mode .table-wrap { scroll-behavior: auto; }
+    @media (prefers-reduced-motion: reduce) {
+      html, .table-wrap { scroll-behavior: auto !important; }
+    }
     @media (max-width: 760px) {
       [data-column="item-timeline"], .item-timeline-cell { min-width: 220px; }
     }
   `;
   document.head.appendChild(style);
+
+  function installSmoothGridScrolling() {
+    if (!tableWrap) return;
+
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const finePointer = window.matchMedia?.("(hover: hover) and (pointer: fine)");
+    let targetLeft = tableWrap.scrollLeft;
+    let targetTop = tableWrap.scrollTop;
+    let frameId = 0;
+
+    const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+
+    function cancelAnimation() {
+      if (frameId) window.cancelAnimationFrame?.(frameId);
+      frameId = 0;
+      targetLeft = tableWrap.scrollLeft;
+      targetTop = tableWrap.scrollTop;
+    }
+
+    function animate() {
+      if (root.classList.contains("performance-mode") || reducedMotion?.matches) {
+        cancelAnimation();
+        return;
+      }
+
+      const leftDifference = targetLeft - tableWrap.scrollLeft;
+      const topDifference = targetTop - tableWrap.scrollTop;
+      const closeEnough = Math.abs(leftDifference) < 0.5 && Math.abs(topDifference) < 0.5;
+
+      if (closeEnough) {
+        tableWrap.scrollLeft = targetLeft;
+        tableWrap.scrollTop = targetTop;
+        frameId = 0;
+        return;
+      }
+
+      tableWrap.scrollLeft += leftDifference * 0.24;
+      tableWrap.scrollTop += topDifference * 0.24;
+      frameId = nextFrame(animate);
+    }
+
+    tableWrap.addEventListener("wheel", (event) => {
+      if (root.classList.contains("performance-mode") || reducedMotion?.matches || !finePointer?.matches) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      const modeMultiplier = event.deltaMode === 1
+        ? 18
+        : event.deltaMode === 2
+          ? tableWrap.clientHeight
+          : 1;
+
+      let deltaX = event.deltaX * modeMultiplier;
+      let deltaY = event.deltaY * modeMultiplier;
+      if (event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)) {
+        deltaX = deltaY;
+        deltaY = 0;
+      }
+
+      deltaX = clamp(deltaX, -220, 220);
+      deltaY = clamp(deltaY, -220, 220);
+
+      const maximumLeft = Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
+      const maximumTop = Math.max(0, tableWrap.scrollHeight - tableWrap.clientHeight);
+      const canScrollHorizontally = deltaX < 0 ? tableWrap.scrollLeft > 0 : deltaX > 0 && tableWrap.scrollLeft < maximumLeft;
+      const canScrollVertically = deltaY < 0 ? tableWrap.scrollTop > 0 : deltaY > 0 && tableWrap.scrollTop < maximumTop;
+
+      if (!canScrollHorizontally && !canScrollVertically) return;
+      event.preventDefault();
+
+      targetLeft = clamp(targetLeft + deltaX, 0, maximumLeft);
+      targetTop = clamp(targetTop + deltaY, 0, maximumTop);
+      if (!frameId) frameId = nextFrame(animate);
+    }, { passive: false });
+
+    tableWrap.addEventListener("pointerdown", cancelAnimation, { passive: true });
+    tableWrap.addEventListener("touchstart", cancelAnimation, { passive: true });
+    tableWrap.addEventListener("scroll", () => {
+      if (!frameId) {
+        targetLeft = tableWrap.scrollLeft;
+        targetTop = tableWrap.scrollTop;
+      }
+    }, { passive: true });
+
+    reducedMotion?.addEventListener?.("change", cancelAnimation);
+  }
 
   function getPoDate() {
     for (const card of summaryGrid.querySelectorAll(".summary-card")) {
@@ -232,5 +351,6 @@
     apply();
   }
 
+  installSmoothGridScrolling();
   installTimelineControl();
 })();
