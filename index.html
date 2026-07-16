@@ -3,57 +3,82 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Import an Excel purchase order report and review PO accounting details in a classic SAP-style workspace." />
-  <meta name="theme-color" content="#0a1f33" />
-  <title>PO Query | Accounting Document Review</title>
+  <meta name="description" content="Import an Excel purchase order report and review PO accounting details in a classic SAP GUI-style workspace." />
+  <meta name="theme-color" content="#6f8fa8" />
+  <title>PO Query | SAP Accounting Review</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="page-shell">
-    <header class="sap-topbar">
+    <header class="sap-topbar" role="banner">
       <div class="sap-topbar-left">
-        <button class="sap-back-button" type="button" aria-label="Back">←</button>
-        <span class="sap-brand">SAP</span>
-        <strong>PO Accounting Review</strong>
+        <span class="sap-window-icon" aria-hidden="true"></span>
+        <span class="sap-brand" aria-label="SAP">SAP</span>
+        <strong>PO Query — Display Purchase Order</strong>
       </div>
       <div class="sap-topbar-actions">
-        <span class="session-indicator"><span></span> Local session</span>
-        <span class="user-badge">RA</span>
+        <span class="session-indicator"><span></span> Connected</span>
+        <span class="sap-window-control" aria-hidden="true">_</span>
+        <span class="sap-window-control" aria-hidden="true">□</span>
+        <span class="sap-window-control close" aria-hidden="true">×</span>
       </div>
     </header>
 
     <nav class="sap-menu" aria-label="Application menu">
-      <button type="button">File</button>
-      <button type="button">Edit</button>
-      <button type="button">View</button>
-      <button type="button">Settings</button>
-      <button type="button">Environment</button>
-      <button type="button">System</button>
-      <button type="button">Help</button>
+      <button type="button" data-menu-action="documents">Purchase Order</button>
+      <button type="button" data-menu-action="edit">Edit</button>
+      <button type="button" data-menu-action="goto">Goto</button>
+      <button type="button" data-menu-action="environment">Environment</button>
+      <button type="button" data-menu-action="system">System</button>
+      <button type="button" data-menu-action="help">Help</button>
     </nav>
 
-    <section class="sap-title-band">
-      <div>
-        <h1>Purchase Order Accounting Review</h1>
-        <p>Review vendor, document value, payment terms, and goods-receipt matching from an imported workbook.</p>
+    <div class="sap-commandbar" role="toolbar" aria-label="Standard toolbar">
+      <button id="commandExecuteButton" class="sap-icon-button enter" type="button" title="Enter" aria-label="Enter">✓</button>
+      <div class="sap-command-field-wrap">
+        <span class="command-label">Command</span>
+        <input id="commandInput" class="sap-command-field" type="text" value="ZPOQUERY" aria-label="Transaction code" spellcheck="false" />
+        <button id="commandHistoryButton" type="button" class="command-history" title="Command history" aria-label="Command history">▾</button>
+      </div>
+      <span class="toolbar-separator"></span>
+      <button id="toolbarSaveButton" class="sap-icon-button" type="button" title="Save / Export" aria-label="Save or export">▣</button>
+      <button id="toolbarBackButton" class="sap-icon-button" type="button" title="Back" aria-label="Back">←</button>
+      <button id="toolbarExitButton" class="sap-icon-button" type="button" title="Exit" aria-label="Exit">↥</button>
+      <button id="toolbarCancelButton" class="sap-icon-button cancel" type="button" title="Cancel" aria-label="Cancel">×</button>
+      <span class="toolbar-separator"></span>
+      <button id="toolbarPrintButton" class="sap-icon-button" type="button" title="Print" aria-label="Print">▤</button>
+      <button id="toolbarFindButton" class="sap-icon-button" type="button" title="Find" aria-label="Find">⌕</button>
+      <button id="toolbarFindNextButton" class="sap-icon-button" type="button" title="Find next" aria-label="Find next">⇥</button>
+      <button id="toolbarNewSessionButton" class="sap-icon-button" type="button" title="Create new session" aria-label="Create new session">▢</button>
+      <button id="toolbarRefreshButton" class="sap-icon-button" type="button" title="Refresh" aria-label="Refresh">⟳</button>
+      <span class="toolbar-spacer"></span>
+      <span class="sap-client-pill">LOCAL / 100 / EN</span>
+    </div>
+
+    <section class="sap-title-band" aria-labelledby="screenTitle">
+      <div class="sap-screen-title">
+        <span class="screen-transaction">ZPOQUERY</span>
+        <div>
+          <h1 id="screenTitle">Display Purchase Order Accounting Review</h1>
+          <p>Vendor, value, payment terms, goods receipt, return, and item timeline.</p>
+        </div>
       </div>
       <div class="title-meta">
-        <span>Company Code</span>
+        <span>Company code</span>
         <strong>LOCAL</strong>
+        <span>Controlling area</span>
+        <strong>1000</strong>
       </div>
     </section>
 
-    <div class="sap-toolbar" role="toolbar" aria-label="Application toolbar">
-      <button type="button" title="Enter">✓</button>
-      <button type="button" title="Save">▣</button>
-      <button type="button" title="Back">←</button>
-      <button type="button" title="Exit">↥</button>
-      <button type="button" title="Cancel">×</button>
-      <span class="toolbar-separator"></span>
-      <button type="button" title="Print">▤</button>
-      <button type="button" title="Find">⌕</button>
-      <button type="button" title="Refresh">⟳</button>
+    <div class="sap-application-toolbar" role="toolbar" aria-label="Application toolbar">
+      <button type="button" data-app-action="select-file">Open workbook</button>
+      <button type="button" data-app-action="execute">Execute</button>
+      <button type="button" data-app-action="technical">Technical info</button>
+      <button type="button" data-app-action="control">Review controls</button>
+      <span class="toolbar-spacer"></span>
+      <span class="application-mode">Display mode</span>
     </div>
 
     <main class="sap-main">
@@ -63,40 +88,35 @@
         <button class="sap-tab" type="button" role="tab" aria-selected="false">Output Control</button>
       </div>
 
-      <section id="uploadPanel" class="sap-panel upload-panel" aria-labelledby="uploadTitle">
+      <section id="uploadPanel" class="sap-panel sap-group-box upload-panel" aria-labelledby="uploadTitle">
         <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
-        <div class="sap-panel-heading">
-          <span id="uploadTitle">Data Source</span>
-          <span class="panel-hint">Workbook remains in this browser</span>
-        </div>
+        <div class="sap-group-title" id="uploadTitle">Source document</div>
         <div class="sap-form-grid">
-          <label>Source Type</label>
+          <label>Source type</label>
           <div class="sap-field readonly-field">Excel purchase order report</div>
-          <span></span>
+          <span class="field-indicator readonly">Display</span>
 
           <label>Workbook</label>
           <div class="sap-field file-field">No file selected</div>
-          <button id="chooseFileButton" class="sap-action-button" type="button">Select File</button>
+          <button id="chooseFileButton" class="sap-action-button" type="button">Select file…</button>
 
-          <label>Supported Formats</label>
+          <label>File type</label>
           <div class="sap-field readonly-field">XLSX / XLS / XLSM / CSV</div>
-          <span></span>
+          <span class="field-indicator">Local</span>
         </div>
       </section>
 
       <section id="workspace" class="workspace" hidden>
-        <div class="sap-status-strip success-strip" role="status">
-          <span class="status-icon">✓</span>
-          <div>
-            <strong>Workbook loaded successfully</strong>
-            <span>The data is ready for accounting document review.</span>
-          </div>
+        <div class="sap-message-line success-strip" role="status">
+          <span class="message-icon">✓</span>
+          <strong>Workbook loaded successfully.</strong>
+          <span>The data is ready for purchase-order review.</span>
         </div>
 
-        <section class="sap-panel file-panel">
-          <div class="sap-panel-heading">
-            <span>Active Workbook</span>
-            <button id="changeFileButton" class="sap-link-button" type="button">Change File</button>
+        <section class="sap-panel sap-group-box file-panel">
+          <div class="sap-group-title">
+            Active workbook
+            <button id="changeFileButton" class="sap-link-button" type="button">Change file</button>
           </div>
           <div class="file-status">
             <div class="file-icon">XLS</div>
@@ -108,107 +128,118 @@
           </div>
         </section>
 
-        <section class="sap-panel search-panel" aria-labelledby="searchTitle">
-          <div class="sap-panel-heading">
-            <span id="searchTitle">Selection Conditions</span>
-            <span class="panel-hint">Enter a PO number to retrieve the accounting view</span>
-          </div>
-
+        <section class="sap-panel sap-group-box search-panel" aria-labelledby="searchTitle">
+          <div class="sap-group-title" id="searchTitle">Selection criteria</div>
           <form id="searchForm" class="sap-form-grid search-form" autocomplete="off">
-            <label for="poSearch">Purchase Order</label>
+            <label for="poSearch"><span class="required-marker">*</span> Purchase order</label>
             <div class="search-input-wrap">
               <input id="poSearch" class="sap-input" type="search" inputmode="numeric" placeholder="Enter PO number" aria-label="Purchase order number" />
               <button id="clearSearchButton" class="clear-button" type="button" aria-label="Clear search" hidden>×</button>
             </div>
-            <button class="sap-action-button execute-button" type="submit">Execute</button>
+            <button class="sap-action-button execute-button" type="submit">Execute (F8)</button>
 
-            <label>Document Category</label>
-            <div class="sap-field readonly-field">Purchase Order / GR Matching</div>
-            <span></span>
+            <label>Document category</label>
+            <div class="sap-field readonly-field">F — Purchase order / GR matching</div>
+            <span class="field-indicator readonly">Display</span>
 
-            <label>Review Scope</label>
-            <div class="sap-field readonly-field">Vendor, amount, TOP, GR, return status</div>
-            <span></span>
+            <label>Review scope</label>
+            <div class="sap-field readonly-field">Vendor, amount, TOP, GR, returns, timeline</div>
+            <span class="field-indicator">All items</span>
           </form>
           <div id="suggestions" class="suggestions" hidden></div>
-          <p id="searchHint" class="search-hint">Enter the complete PO number or start typing to see matching records.</p>
+          <p id="searchHint" class="search-hint">Enter the complete PO number or start typing to display matching documents.</p>
         </section>
 
         <section id="resultArea" class="result-area" aria-live="polite">
-          <div id="welcomeState" class="empty-state sap-panel">
-            <div class="empty-ledger">≡</div>
-            <h3>No accounting document selected</h3>
-            <p>Use the selection conditions above to retrieve a purchase order and its matching goods-receipt information.</p>
+          <div id="welcomeState" class="empty-state sap-panel sap-group-box">
+            <div class="sap-group-title">Document overview</div>
+            <div class="empty-content">
+              <div class="empty-ledger">≡</div>
+              <h3>No purchase order selected</h3>
+              <p>Enter a purchase order in the selection criteria and choose Execute.</p>
+            </div>
           </div>
 
-          <div id="noResultState" class="empty-state sap-panel" hidden>
-            <div class="empty-ledger warning">!</div>
-            <h3>Purchase order not found</h3>
-            <p id="noResultMessage">Check the PO number and try again.</p>
+          <div id="noResultState" class="empty-state sap-panel sap-group-box" hidden>
+            <div class="sap-group-title">Document overview</div>
+            <div class="empty-content">
+              <div class="empty-ledger warning">!</div>
+              <h3>Purchase order not found</h3>
+              <p id="noResultMessage">Check the PO number and try again.</p>
+            </div>
           </div>
 
           <div id="poResult" hidden>
             <section class="sap-panel document-header-panel">
+              <div class="document-header-titlebar">
+                <span>Purchase Order</span>
+                <div class="result-actions">
+                  <button id="copySummaryButton" class="sap-link-button bordered" type="button">Copy</button>
+                  <button id="printButton" class="sap-link-button bordered" type="button">Print</button>
+                </div>
+              </div>
               <div class="document-header">
                 <div>
-                  <span class="document-kicker">ACCOUNTING DOCUMENT</span>
+                  <span class="document-kicker">DOCUMENT NUMBER</span>
                   <div class="result-title-row">
                     <h2 id="resultPoNumber"></h2>
                     <span id="resultStatus" class="status-badge"></span>
                   </div>
                   <p id="resultSupplier"></p>
                 </div>
-                <div class="result-actions">
-                  <button id="copySummaryButton" class="sap-link-button bordered" type="button">Copy Summary</button>
-                  <button id="printButton" class="sap-link-button bordered" type="button">Print</button>
+                <div class="header-mode-box">
+                  <span>Processing status</span>
+                  <strong>Display</strong>
                 </div>
               </div>
             </section>
 
-            <section class="sap-panel object-section" aria-labelledby="generalInfoTitle">
-              <div class="sap-panel-heading">
-                <span id="generalInfoTitle">Document Header</span>
+            <section class="sap-panel sap-group-box object-section" aria-labelledby="generalInfoTitle">
+              <div class="sap-group-title">
+                <span id="generalInfoTitle">Header data</span>
                 <span class="panel-hint">Accounting attributes</span>
               </div>
               <div id="summaryGrid" class="summary-grid"></div>
             </section>
 
-            <div id="topNotice" class="sap-status-strip warning-strip" hidden>
-              <span class="status-icon">!</span>
-              <div>
-                <strong>Payment terms are unavailable</strong>
-                <span>Add a column named TOP, Payment Terms, Terms of Payment, or Payment Term.</span>
-              </div>
+            <div id="topNotice" class="sap-message-line warning-strip" hidden>
+              <span class="message-icon">!</span>
+              <strong>Payment terms are unavailable.</strong>
+              <span>Add a column named TOP, Payment Terms, Terms of Payment, or Payment Term.</span>
             </div>
 
             <section class="sap-panel object-section items-section" aria-labelledby="itemsTitle">
-              <div class="sap-panel-heading table-heading">
+              <div class="document-header-titlebar table-heading">
                 <div>
-                  <span class="document-kicker">LINE ITEM ACCOUNTING VIEW</span>
-                  <strong id="itemsTitle">Purchase Order Items</strong>
+                  <span class="document-kicker">ITEM OVERVIEW</span>
+                  <strong id="itemsTitle">Purchase order items</strong>
                 </div>
                 <span id="itemCountBadge" class="sap-chip"></span>
               </div>
 
               <div class="alv-toolbar" role="toolbar" aria-label="Table toolbar">
-                <button type="button">Sort</button>
-                <button type="button">Filter</button>
-                <button type="button">Subtotal</button>
-                <button type="button">Layout</button>
+                <button id="alvSortButton" type="button" title="Sort item rows">Sort</button>
+                <button id="alvFilterButton" type="button" title="Filter item rows">Filter</button>
+                <button id="alvSubtotalButton" type="button" title="Calculate visible subtotal">Subtotal</button>
+                <button id="alvLayoutButton" type="button" title="Switch grid layout">Layout</button>
+                <span class="toolbar-separator"></span>
+                <button id="alvTopButton" type="button" title="Scroll to first item">First row</button>
+                <button id="alvBottomButton" type="button" title="Scroll to last item">Last row</button>
                 <span class="toolbar-spacer"></span>
-                <span>ALV Grid</span>
+                <span>ALV Grid / Display</span>
               </div>
+              <div id="alvSubtotalLine" class="alv-subtotal-line" hidden></div>
 
-              <div class="table-wrap">
+              <div class="table-wrap" tabindex="0" aria-label="Purchase order item grid">
                 <table>
                   <thead>
                     <tr>
                       <th>Item</th>
                       <th>Description</th>
                       <th class="number-cell">Quantity</th>
-                      <th class="number-cell">Unit Price</th>
-                      <th class="number-cell">Net Value</th>
-                      <th>Goods Receipt</th>
+                      <th class="number-cell">Unit price</th>
+                      <th class="number-cell">Net value</th>
+                      <th>Goods receipt</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -217,9 +248,9 @@
               </div>
             </section>
 
-            <section id="detectedColumnsSection" class="sap-panel detected-section">
+            <section id="detectedColumnsSection" class="sap-panel sap-group-box detected-section">
               <details>
-                <summary>Technical Information: Detected Workbook Columns</summary>
+                <summary>Technical information: detected workbook columns</summary>
                 <div id="detectedColumns" class="detected-columns"></div>
               </details>
             </section>
@@ -229,10 +260,12 @@
     </main>
 
     <footer class="sap-footer">
-      <span class="footer-status">Ready</span>
-      <span>PO Query</span>
-      <span>Local processing</span>
-      <span>Accounting review workspace</span>
+      <span class="footer-status-icon">✓</span>
+      <span id="footerStatusText" class="footer-status">Ready</span>
+      <span>ZPOQUERY</span>
+      <span>LOCAL</span>
+      <span>Client 100</span>
+      <span>INS</span>
     </footer>
   </div>
 
@@ -242,5 +275,6 @@
   <script src="app.js"></script>
   <script src="gr-date.js"></script>
   <script src="item-timeline.js"></script>
+  <script src="sap-controls.js"></script>
 </body>
 </html>
