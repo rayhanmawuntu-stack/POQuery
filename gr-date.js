@@ -1,6 +1,66 @@
 (() => {
   "use strict";
 
+  const root = document.documentElement;
+  const nextFrame = window.requestAnimationFrame?.bind(window) || ((callback) => window.setTimeout(callback, 0));
+  const deviceMemory = Number(navigator.deviceMemory || 0);
+  const cpuCores = Number(navigator.hardwareConcurrency || 0);
+  const autoPerformanceMode = (deviceMemory > 0 && deviceMemory <= 4) || (cpuCores > 0 && cpuCores <= 4);
+
+  root.classList.toggle("performance-mode", autoPerformanceMode);
+
+  function optimizeSheetJs() {
+    if (!window.XLSX || window.XLSX.__poQueryPerformanceWrapped) return;
+
+    const originalRead = window.XLSX.read.bind(window.XLSX);
+    window.XLSX.read = (data, options = {}) => {
+      if (!root.classList.contains("performance-mode")) return originalRead(data, options);
+
+      return originalRead(data, {
+        ...options,
+        dense: true,
+        cellDates: false,
+        cellStyles: false,
+        cellHTML: false,
+        cellNF: false,
+        bookVBA: false,
+        bookFiles: false,
+        bookDeps: false
+      });
+    };
+
+    window.XLSX.__poQueryPerformanceWrapped = true;
+  }
+
+  optimizeSheetJs();
+
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  if (originalScrollIntoView && !Element.prototype.__poQueryScrollWrapped) {
+    Element.prototype.scrollIntoView = function scrollIntoView(options) {
+      if (root.classList.contains("performance-mode") && options && typeof options === "object") {
+        return originalScrollIntoView.call(this, { ...options, behavior: "auto" });
+      }
+      return originalScrollIntoView.call(this, options);
+    };
+    Element.prototype.__poQueryScrollWrapped = true;
+  }
+
+  const debouncedInputEvents = new WeakSet();
+  let searchTimer = 0;
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.id !== "poSearch") return;
+    if (!root.classList.contains("performance-mode") || debouncedInputEvents.has(event)) return;
+
+    event.stopImmediatePropagation();
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => {
+      const deferredEvent = new Event("input", { bubbles: true });
+      debouncedInputEvents.add(deferredEvent);
+      target.dispatchEvent(deferredEvent);
+    }, 110);
+  }, true);
+
   const tableBody = document.getElementById("itemsTableBody");
   const headerRow = tableBody?.closest("table")?.querySelector("thead tr");
 
@@ -24,47 +84,73 @@
     };
   }
 
+  function createMutedValue(text) {
+    const span = document.createElement("span");
+    span.className = "muted-value";
+    span.textContent = text;
+    return span;
+  }
+
   function renderGrDates() {
     if (!tableBody || !headerRow) return;
     ensureGrDateHeader();
 
-    tableBody.querySelectorAll(":scope > tr").forEach((row) => {
-      const cells = [...row.children];
-      if (cells.length < 7) return;
+    for (const row of tableBody.rows) {
+      if (row.dataset.grDateRendered === "true") continue;
+      const cells = row.cells;
+      if (cells.length < 7) continue;
 
       const receiptCell = cells[5];
       const statusCell = cells[cells.length - 1];
-      const receipts = [...receiptCell.querySelectorAll(".gr-chip")].map((chip) => {
-        if (!chip.dataset.grNumber || !chip.dataset.grDate) {
-          const parsed = splitReceiptLabel(chip.textContent || "");
-          chip.dataset.grNumber = parsed.number || "—";
-          chip.dataset.grDate = parsed.date || "—";
+      const dateCell = document.createElement("td");
+      dateCell.className = "gr-date-cell";
+      const receiptChips = [...receiptCell.querySelectorAll(".gr-chip")];
+
+      if (receiptChips.length) {
+        const dateList = document.createElement("div");
+        dateList.className = "gr-list";
+
+        for (const chip of receiptChips) {
+          if (!chip.dataset.grNumber || !chip.dataset.grDate) {
+            const parsed = splitReceiptLabel(chip.textContent || "");
+            chip.dataset.grNumber = parsed.number || "—";
+            chip.dataset.grDate = parsed.date || "—";
+          }
+
+          chip.textContent = chip.dataset.grNumber;
+          const dateChip = document.createElement("span");
+          dateChip.className = `gr-chip${chip.classList.contains("cancelled") ? " cancelled" : ""}`;
+          dateChip.title = chip.classList.contains("cancelled")
+            ? "Cancelled goods receipt date"
+            : "Goods receipt date";
+          dateChip.textContent = chip.dataset.grDate;
+          dateList.appendChild(dateChip);
         }
 
-        chip.textContent = chip.dataset.grNumber;
-        return {
-          date: chip.dataset.grDate,
-          cancelled: chip.classList.contains("cancelled")
-        };
-      });
-
-      let dateCell = row.querySelector(":scope > .gr-date-cell");
-      if (!dateCell) {
-        dateCell = document.createElement("td");
-        dateCell.className = "gr-date-cell";
-        row.insertBefore(dateCell, statusCell);
+        dateCell.appendChild(dateList);
+      } else {
+        dateCell.appendChild(createMutedValue("No GR date"));
       }
 
-      dateCell.innerHTML = receipts.length
-        ? `<div class="gr-list">${receipts.map((receipt) => `<span class="gr-chip${receipt.cancelled ? " cancelled" : ""}" title="${receipt.cancelled ? "Cancelled goods receipt date" : "Goods receipt date"}">${receipt.date}</span>`).join("")}</div>`
-        : '<span class="muted-value">No GR date</span>';
+      row.insertBefore(dateCell, statusCell);
+      row.dataset.grDateRendered = "true";
+    }
+  }
+
+  let grRenderQueued = false;
+  function scheduleGrDateRender() {
+    if (grRenderQueued) return;
+    grRenderQueued = true;
+    nextFrame(() => {
+      grRenderQueued = false;
+      renderGrDates();
     });
   }
 
   if (tableBody && headerRow) {
-    const receiptObserver = new MutationObserver(renderGrDates);
+    const receiptObserver = new MutationObserver(scheduleGrDateRender);
     receiptObserver.observe(tableBody, { childList: true });
-    renderGrDates();
+    scheduleGrDateRender();
   }
 
   const tabBar = document.querySelector(".sap-tabs");
@@ -90,12 +176,12 @@
     .tab-intro { padding: 10px 12px; color: #333; border-bottom: 1px solid #aaa; background: #f5f4ec; }
     .tab-intro strong { display: block; margin-bottom: 3px; color: #0e3957; }
     .tab-intro span { font-size: 11px; color: #555; }
-    .control-options { padding: 10px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .control-option { min-height: 66px; padding: 9px 10px; display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 3px 8px; border: 1px solid #aaa99f; background: #f1f0e8; cursor: pointer; }
+    .control-options { padding: 10px 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .control-option { min-height: 72px; padding: 9px 10px; display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 3px 8px; border: 1px solid #aaa99f; background: #f1f0e8; cursor: pointer; }
     .control-option input { margin: 2px 0 0; accent-color: #225b80; }
     .control-option strong { color: #123e5d; font-size: 12px; }
     .control-option span { grid-column: 2; color: #555; font-size: 10px; line-height: 1.35; }
-    .control-status-grid { margin: 0 12px 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid #aaa99f; border-left: 1px solid #aaa99f; }
+    .control-status-grid { margin: 0 12px 10px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid #aaa99f; border-left: 1px solid #aaa99f; }
     .control-status-item { min-height: 52px; padding: 7px 9px; border-right: 1px solid #aaa99f; border-bottom: 1px solid #aaa99f; background: #fff; }
     .control-status-item span { display: block; color: #555; font-size: 9px; font-weight: 700; text-transform: uppercase; }
     .control-status-item strong { display: block; margin-top: 5px; color: #111; font-size: 11px; }
@@ -113,6 +199,27 @@
     .compact-grid .table-wrap th, .compact-grid .table-wrap td { padding-top: 2px; padding-bottom: 2px; font-size: 10px; }
     .hide-gr-date [data-column="gr-date"], .hide-gr-date .gr-date-cell { display: none !important; }
     .hide-cancelled-gr .gr-chip.cancelled { display: none !important; }
+    html.performance-mode { scroll-behavior: auto !important; }
+    .performance-mode .sap-title-band,
+    .performance-mode .output-card-heading,
+    .performance-mode th,
+    .performance-mode .sap-action-button,
+    .performance-mode .sap-link-button { background-image: none !important; }
+    .performance-mode .sap-panel,
+    .performance-mode .toast,
+    .performance-mode .sap-title-band { box-shadow: none !important; }
+    .performance-mode .sap-panel,
+    .performance-mode .sap-tab,
+    .performance-mode button,
+    .performance-mode .toast { transition: none !important; animation: none !important; }
+    .performance-mode .detected-section { content-visibility: auto; contain-intrinsic-size: 80px; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto !important; }
+      .sap-panel, .sap-tab, button, .toast { transition: none !important; animation: none !important; }
+    }
+    @media (max-width: 1000px) {
+      .control-options, .control-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     @media (max-width: 760px) {
       .control-options, .control-status-grid, .output-layout { grid-template-columns: 1fr; }
       .output-document-state { grid-template-columns: 90px 1fr; }
@@ -128,17 +235,17 @@
   controlPanel.innerHTML = `
     <div class="sap-panel-heading">
       <span>Review Controls</span>
-      <span class="panel-hint">Display and validation settings for the imported workbook</span>
+      <span class="panel-hint">Display, validation, and performance settings</span>
     </div>
     <div class="tab-intro">
       <strong>Accounting review configuration</strong>
-      <span>These settings change how the item-level GR matching grid is displayed. They do not modify the imported workbook.</span>
+      <span>These settings change the local display only and never modify the imported workbook.</span>
     </div>
     <div class="control-options">
       <label class="control-option">
         <input id="showGrDateToggle" type="checkbox" checked />
         <strong>Show GR Date per item</strong>
-        <span>Displays the matching posting date beside each goods-receipt document.</span>
+        <span>Displays the posting date beside each matching goods-receipt document.</span>
       </label>
       <label class="control-option">
         <input id="showCancelledToggle" type="checkbox" checked />
@@ -148,13 +255,19 @@
       <label class="control-option">
         <input id="compactGridToggle" type="checkbox" />
         <strong>Compact accounting grid</strong>
-        <span>Reduces row height for reviewing larger purchase orders.</span>
+        <span>Reduces row height when reviewing purchase orders with many items.</span>
+      </label>
+      <label class="control-option">
+        <input id="performanceModeToggle" type="checkbox" ${autoPerformanceMode ? "checked" : ""} />
+        <strong>Low-spec performance mode</strong>
+        <span>Uses a memory-efficient Excel parser, delayed suggestions, and lighter visual effects.</span>
       </label>
     </div>
     <div class="control-status-grid">
       <div class="control-status-item"><span>Workbook status</span><strong id="controlWorkbookState">Not loaded</strong></div>
       <div class="control-status-item"><span>GR Date mapping</span><strong id="controlGrDateState">Waiting for workbook</strong></div>
-      <div class="control-status-item"><span>Processing mode</span><strong>Local browser session</strong></div>
+      <div class="control-status-item"><span>Performance mode</span><strong id="controlPerformanceState">${autoPerformanceMode ? "Enabled automatically" : "Standard mode"}</strong></div>
+      <div class="control-status-item"><span>Device profile</span><strong>${cpuCores || "?"} logical cores · ${deviceMemory || "?"} GB memory</strong></div>
     </div>
     <div class="tab-actions-row">
       <button id="resetControlButton" class="sap-action-button" type="button">Reset Display Controls</button>
@@ -190,7 +303,7 @@
             <button id="outputCsvButton" class="sap-action-button" type="button" disabled>Export Item Grid as CSV</button>
             <button id="outputReturnButton" class="sap-link-button bordered" type="button">Return to Documents</button>
           </div>
-          <p class="output-help">CSV export includes the item-level GR number and the matching GR date for each purchase-order item.</p>
+          <p class="output-help">CSV export includes each item, its GR document, and the matching GR date.</p>
         </div>
       </div>
     </div>
@@ -221,12 +334,12 @@
   function showTab(name, focusButton = false) {
     const selected = tabs.find((tab) => tab.name === name) || tabs[0];
 
-    tabs.forEach((tab) => {
+    for (const tab of tabs) {
       const active = tab === selected;
       tab.button.classList.toggle("active", active);
       tab.button.setAttribute("aria-selected", active ? "true" : "false");
       tab.button.tabIndex = active ? 0 : -1;
-    });
+    }
 
     const documentsActive = selected.name === "documents";
     uploadPanel.classList.toggle("tab-hidden", !documentsActive);
@@ -257,24 +370,33 @@
   const showGrDateToggle = controlPanel.querySelector("#showGrDateToggle");
   const showCancelledToggle = controlPanel.querySelector("#showCancelledToggle");
   const compactGridToggle = controlPanel.querySelector("#compactGridToggle");
+  const performanceModeToggle = controlPanel.querySelector("#performanceModeToggle");
   const resetControlButton = controlPanel.querySelector("#resetControlButton");
   const controlReturnButton = controlPanel.querySelector("#controlReturnButton");
   const controlWorkbookState = controlPanel.querySelector("#controlWorkbookState");
   const controlGrDateState = controlPanel.querySelector("#controlGrDateState");
+  const controlPerformanceState = controlPanel.querySelector("#controlPerformanceState");
 
   function applyControls() {
     document.body.classList.toggle("hide-gr-date", !showGrDateToggle.checked);
     document.body.classList.toggle("hide-cancelled-gr", !showCancelledToggle.checked);
     document.body.classList.toggle("compact-grid", compactGridToggle.checked);
+    root.classList.toggle("performance-mode", performanceModeToggle.checked);
+    controlPerformanceState.textContent = performanceModeToggle.checked ? "Enabled" : "Standard mode";
   }
 
   showGrDateToggle.addEventListener("change", applyControls);
   showCancelledToggle.addEventListener("change", applyControls);
   compactGridToggle.addEventListener("change", applyControls);
+  performanceModeToggle.addEventListener("change", () => {
+    applyControls();
+    notify(performanceModeToggle.checked ? "Low-spec performance mode enabled" : "Standard display mode enabled");
+  });
   resetControlButton.addEventListener("click", () => {
     showGrDateToggle.checked = true;
     showCancelledToggle.checked = true;
     compactGridToggle.checked = false;
+    performanceModeToggle.checked = autoPerformanceMode;
     applyControls();
     notify("Display controls reset");
   });
@@ -309,8 +431,7 @@
 
   function updateOutputState() {
     const selected = hasSelectedPo();
-    const poNumber = currentPoNumber();
-    outputPoNumber.textContent = selected ? poNumber : "No document selected";
+    outputPoNumber.textContent = selected ? currentPoNumber() : "No document selected";
     outputSelectionState.textContent = selected ? "Ready for output" : "Select a PO in Documents";
     outputCopyButton.disabled = !selected;
     outputPrintButton.disabled = !selected;
@@ -325,7 +446,7 @@
   outputPrintButton.addEventListener("click", () => {
     if (!hasSelectedPo()) return notify("Select a purchase order first");
     showTab("documents");
-    window.setTimeout(() => existingPrintButton?.click(), 50);
+    window.setTimeout(() => existingPrintButton?.click(), 20);
   });
 
   function csvEscape(value) {
@@ -337,10 +458,14 @@
     if (!hasSelectedPo() || !tableBody || !headerRow) return notify("Select a purchase order first");
     renderGrDates();
 
-    const headers = [...headerRow.children].map((cell) => csvEscape(cell.textContent));
-    const rows = [...tableBody.querySelectorAll(":scope > tr")].map((row) =>
-      [...row.children].map((cell) => csvEscape(cell.textContent)).join(",")
-    );
+    const hideGrDate = document.body.classList.contains("hide-gr-date");
+    const headerCells = [...headerRow.children].filter((cell) => !(hideGrDate && cell.dataset.column === "gr-date"));
+    const headers = headerCells.map((cell) => csvEscape(cell.textContent));
+    const rows = [...tableBody.rows].map((row) => {
+      const cells = [...row.cells].filter((cell) => !(hideGrDate && cell.classList.contains("gr-date-cell")));
+      return cells.map((cell) => csvEscape(cell.textContent)).join(",");
+    });
+
     const csv = [headers.join(","), ...rows].join("\r\n");
     const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -361,18 +486,26 @@
     toast.textContent = message;
     toast.classList.add("show");
     window.clearTimeout(notify.timeout);
-    notify.timeout = window.setTimeout(() => toast.classList.remove("show"), 2200);
+    notify.timeout = window.setTimeout(() => toast.classList.remove("show"), 1800);
   }
 
-  const stateObserver = new MutationObserver(() => {
-    updateControlState();
-    updateOutputState();
-  });
+  let stateUpdateQueued = false;
+  function scheduleStateUpdate() {
+    if (stateUpdateQueued) return;
+    stateUpdateQueued = true;
+    nextFrame(() => {
+      stateUpdateQueued = false;
+      updateControlState();
+      updateOutputState();
+    });
+  }
+
+  const stateObserver = new MutationObserver(scheduleStateUpdate);
   stateObserver.observe(workspace, { attributes: true, attributeFilter: ["hidden"] });
   if (poResult) stateObserver.observe(poResult, { attributes: true, attributeFilter: ["hidden"] });
   if (resultPoNumber) stateObserver.observe(resultPoNumber, { childList: true });
   const detectedColumns = document.getElementById("detectedColumns");
-  if (detectedColumns) stateObserver.observe(detectedColumns, { childList: true, subtree: true });
+  if (detectedColumns) stateObserver.observe(detectedColumns, { childList: true });
 
   applyControls();
   updateControlState();
