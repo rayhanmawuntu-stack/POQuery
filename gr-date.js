@@ -35,10 +35,15 @@
       const receiptCell = cells[5];
       const statusCell = cells[cells.length - 1];
       const receipts = [...receiptCell.querySelectorAll(".gr-chip")].map((chip) => {
-        const receipt = splitReceiptLabel(chip.textContent || "");
-        chip.textContent = receipt.number || "—";
+        if (!chip.dataset.grNumber || !chip.dataset.grDate) {
+          const parsed = splitReceiptLabel(chip.textContent || "");
+          chip.dataset.grNumber = parsed.number || "—";
+          chip.dataset.grDate = parsed.date || "—";
+        }
+
+        chip.textContent = chip.dataset.grNumber;
         return {
-          date: receipt.date,
+          date: chip.dataset.grDate,
           cancelled: chip.classList.contains("cancelled")
         };
       });
@@ -185,7 +190,7 @@
             <button id="outputCsvButton" class="sap-action-button" type="button" disabled>Export Item Grid as CSV</button>
             <button id="outputReturnButton" class="sap-link-button bordered" type="button">Return to Documents</button>
           </div>
-          <p class="output-help">CSV export includes the visible item-level columns, including the GR number and matching GR date for each item.</p>
+          <p class="output-help">CSV export includes the item-level GR number and the matching GR date for each purchase-order item.</p>
         </div>
       </div>
     </div>
@@ -194,8 +199,13 @@
   tabBar.insertAdjacentElement("afterend", outputPanel);
   tabBar.insertAdjacentElement("afterend", controlPanel);
 
+  uploadPanel.setAttribute("role", "tabpanel");
+  uploadPanel.setAttribute("aria-labelledby", "documentsTab");
+  controlPanel.setAttribute("aria-labelledby", "controlTab");
+  outputPanel.setAttribute("aria-labelledby", "outputTab");
+
   const tabs = [
-    { button: tabButtons[0], name: "documents", panelId: "documentsTabPanel" },
+    { button: tabButtons[0], name: "documents", panelId: uploadPanel.id },
     { button: tabButtons[1], name: "control", panelId: controlPanel.id },
     { button: tabButtons[2], name: "output", panelId: outputPanel.id }
   ];
@@ -207,9 +217,6 @@
     tab.button.setAttribute("aria-selected", index === 0 ? "true" : "false");
     tab.button.tabIndex = index === 0 ? 0 : -1;
   });
-
-  controlPanel.setAttribute("aria-labelledby", "controlTab");
-  outputPanel.setAttribute("aria-labelledby", "outputTab");
 
   function showTab(name, focusButton = false) {
     const selected = tabs.find((tab) => tab.name === name) || tabs[0];
@@ -275,8 +282,9 @@
 
   function updateControlState() {
     const workbookLoaded = !workspace.hidden;
-    const detectedColumnsText = document.getElementById("detectedColumns")?.textContent || "";
-    const grDateDetected = /GR Date:\s*(?!not found)/i.test(detectedColumnsText);
+    const grDateChip = [...document.querySelectorAll("#detectedColumns .column-chip")]
+      .find((chip) => chip.textContent.trim().toLowerCase().startsWith("gr date:"));
+    const grDateDetected = Boolean(grDateChip) && !/not found/i.test(grDateChip.textContent);
 
     controlWorkbookState.textContent = workbookLoaded ? "Workbook loaded" : "Not loaded";
     controlGrDateState.textContent = workbookLoaded
