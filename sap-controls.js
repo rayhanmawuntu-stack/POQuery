@@ -1,406 +1,633 @@
 (() => {
   "use strict";
 
-  const $ = (selector, scope = document) => scope.querySelector(selector);
-  const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+  const documentTabs = [...document.querySelectorAll(".sap-tabs .sap-tab")];
+  const poSearch = document.getElementById("poSearch");
+  const searchForm = document.getElementById("searchForm");
+  const fileInput = document.getElementById("fileInput");
+  const suggestions = document.getElementById("suggestions");
+  const welcomeState = document.getElementById("welcomeState");
+  const noResultState = document.getElementById("noResultState");
+  const poResult = document.getElementById("poResult");
+  const resultPoNumber = document.getElementById("resultPoNumber");
+  const resultSupplier = document.getElementById("resultSupplier");
+  const summaryGrid = document.getElementById("summaryGrid");
+  const tableBody = document.getElementById("itemsTableBody");
+  const table = tableBody?.closest("table");
+  const tableWrap = table?.closest(".table-wrap");
+  const subtotalLine = document.getElementById("alvSubtotalLine");
+  const detectedDetails = document.querySelector("#detectedColumnsSection details");
+  const footerStatus = document.getElementById("footerStatusText");
+  const toast = document.getElementById("toast");
 
-  const tabs = $$(".sap-tabs .sap-tab");
-  const searchForm = $("#searchForm");
-  const poSearch = $("#poSearch");
-  const workspace = $("#workspace");
-  const poResult = $("#poResult");
-  const welcomeState = $("#welcomeState");
-  const noResultState = $("#noResultState");
-  const clearSearchButton = $("#clearSearchButton");
-  const chooseFileButton = $("#chooseFileButton");
-  const itemsTableBody = $("#itemsTableBody");
-  const tableWrap = $(".table-wrap");
-  const footerStatus = $("#footerStatusText");
-  const toast = $("#toast");
-  const subtotalLine = $("#alvSubtotalLine");
+  if (!searchForm || !poSearch || !fileInput || !tableBody || !table) return;
 
-  let sortAscending = true;
-  let activeFilter = "";
+  const button = (id) => document.getElementById(id);
 
-  function setStatus(message, kind = "ready") {
+  function notify(message) {
     if (footerStatus) footerStatus.textContent = message;
-    const icon = $(".footer-status-icon");
-    if (icon) {
-      icon.textContent = kind === "error" ? "×" : kind === "warning" ? "!" : "✓";
-      icon.style.color = kind === "error" ? "#9f0000" : kind === "warning" ? "#9b5a00" : "#1c6b28";
-    }
-  }
-
-  function notify(message, kind = "ready") {
-    setStatus(message, kind);
     if (!toast) return;
     toast.textContent = message;
     toast.classList.add("show");
     window.clearTimeout(notify.timeout);
-    notify.timeout = window.setTimeout(() => toast.classList.remove("show"), 2100);
+    notify.timeout = window.setTimeout(() => toast.classList.remove("show"), 1900);
   }
 
-  function showTab(index, focus = false) {
-    const button = tabs[index];
-    if (!button) return;
-    button.click();
-    if (focus) button.focus();
+  function activateTab(index) {
+    const target = documentTabs[index];
+    if (!target) return;
+    target.click();
   }
 
   function showDocuments() {
-    showTab(0);
+    activateTab(0);
   }
 
-  function selectedPoNumber() {
-    return $("#resultPoNumber")?.textContent?.trim() || "";
+  function showControl() {
+    activateTab(1);
+  }
+
+  function showOutput() {
+    activateTab(2);
+  }
+
+  function hasWorkbook() {
+    const workspace = document.getElementById("workspace");
+    return Boolean(workspace && !workspace.hidden);
   }
 
   function hasSelectedPo() {
-    return Boolean(selectedPoNumber()) && poResult && !poResult.hidden;
+    return Boolean(resultPoNumber?.textContent?.trim()) && Boolean(poResult && !poResult.hidden);
   }
 
-  function focusSearch(selectText = false) {
-    showDocuments();
-    if (workspace?.hidden) {
-      chooseFileButton?.focus();
-      notify("Select an Excel workbook first", "warning");
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      poSearch?.focus({ preventScroll: false });
-      if (selectText) poSearch?.select();
-    });
-  }
-
-  function executeSearch() {
-    showDocuments();
-    if (workspace?.hidden) {
-      chooseFileButton?.click();
-      notify("Choose a workbook to begin", "warning");
-      return;
-    }
-    if (!poSearch?.value.trim()) {
-      focusSearch();
-      notify("Enter a purchase order number", "warning");
-      return;
-    }
-    searchForm?.requestSubmit();
-    notify(`Executing PO ${poSearch.value.trim()}`);
-  }
-
-  function clearCurrentDocument() {
-    showDocuments();
-    if (poSearch) {
-      poSearch.value = "";
-      poSearch.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    if (clearSearchButton) clearSearchButton.hidden = true;
-    const suggestions = $("#suggestions");
+  function clearSelection() {
+    poSearch.value = "";
+    const clearButton = document.getElementById("clearSearchButton");
+    if (clearButton) clearButton.hidden = true;
     if (suggestions) suggestions.hidden = true;
     if (poResult) poResult.hidden = true;
     if (noResultState) noResultState.hidden = true;
     if (welcomeState) welcomeState.hidden = false;
     if (subtotalLine) subtotalLine.hidden = true;
-    activeFilter = "";
-    for (const row of itemsTableBody?.rows || []) row.hidden = false;
-    focusSearch();
+    for (const row of tableBody.rows) row.hidden = false;
+    delete tableBody.dataset.filterTerm;
     notify("Selection cleared");
   }
 
-  function exportCurrentDocument() {
-    if (!hasSelectedPo()) {
-      notify("Select a purchase order before exporting", "warning");
-      return;
-    }
-    const exportButton = $("#outputCsvButton");
-    if (!exportButton) {
-      notify("Output controls are not available", "error");
-      return;
-    }
-    exportButton.click();
-    notify(`Exporting PO ${selectedPoNumber()}`);
-  }
-
-  function printCurrentDocument() {
-    if (!hasSelectedPo()) {
-      notify("Select a purchase order before printing", "warning");
-      return;
-    }
-    $("#printButton")?.click();
-  }
-
-  function showTechnicalInfo() {
+  function focusSearch() {
     showDocuments();
-    const details = $("#detectedColumnsSection details");
-    if (!details) {
-      notify("Load a workbook to view technical information", "warning");
+    if (!hasWorkbook()) {
+      fileInput.click();
       return;
     }
-    details.open = true;
-    details.scrollIntoView({ behavior: document.documentElement.classList.contains("performance-mode") ? "auto" : "smooth", block: "center" });
-    notify("Technical information displayed");
+    poSearch.focus();
+    poSearch.select();
+    notify("Enter purchase order number");
   }
 
-  function gotoDocument() {
+  function executeSearch() {
     showDocuments();
-    if (!hasSelectedPo()) {
-      focusSearch();
-      notify("Select a purchase order first", "warning");
+    if (!hasWorkbook()) {
+      fileInput.click();
+      notify("Select a workbook first");
       return;
     }
-    poResult.scrollIntoView({ behavior: document.documentElement.classList.contains("performance-mode") ? "auto" : "smooth", block: "start" });
-    notify(`Displaying PO ${selectedPoNumber()}`);
+    searchForm.requestSubmit();
   }
 
-  function showHelp() {
-    let dialog = $("#sapHelpDialog");
-    if (!dialog) {
-      dialog = document.createElement("dialog");
-      dialog.id = "sapHelpDialog";
-      dialog.className = "help-dialog";
-      dialog.innerHTML = `
-        <header>PO Query — SAP Help</header>
-        <div class="help-body">
-          <strong>Available transaction commands</strong>
-          <div><code>ZPOQUERY</code> Open Documents</div>
-          <div><code>ZCONTROL</code> Open Review Controls</div>
-          <div><code>ZOUTPUT</code> Open Output Control</div>
-          <div><code>ZTECH</code> Show detected workbook columns</div>
-          <div><code>PRINT</code> Print the selected purchase order</div>
-          <div><code>EXPORT</code> Export the selected item grid to CSV</div>
-          <div><code>/N</code> Clear the current selection</div>
-          <strong>Keyboard</strong>
-          <div>F8 Execute · F3 Back · Esc Cancel · Ctrl/Cmd+P Print</div>
-        </div>
-        <footer><button class="sap-action-button" type="button">Close</button></footer>
-      `;
-      document.body.appendChild(dialog);
-      $("button", dialog).addEventListener("click", () => dialog.close());
-      dialog.addEventListener("click", (event) => {
-        if (event.target === dialog) dialog.close();
-      });
-    }
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else alert("Commands: ZPOQUERY, ZCONTROL, ZOUTPUT, ZTECH, PRINT, EXPORT, /N");
-    notify("Help opened");
-  }
-
-  function executeCommand() {
-    const input = $("#commandInput");
-    const command = input?.value.trim().toUpperCase().replace(/\s+/g, "") || "ZPOQUERY";
-    const actions = {
-      "ZPOQUERY": () => { showDocuments(); notify("Transaction ZPOQUERY"); },
-      "/NZPOQUERY": () => { clearCurrentDocument(); showDocuments(); },
-      "ZCONTROL": () => { showTab(1); notify("Review Controls"); },
-      "/NZCONTROL": () => { showTab(1); notify("Review Controls"); },
-      "ZOUTPUT": () => { showTab(2); notify("Output Control"); },
-      "/NZOUTPUT": () => { showTab(2); notify("Output Control"); },
-      "ZTECH": showTechnicalInfo,
-      "PRINT": printCurrentDocument,
-      "EXPORT": exportCurrentDocument,
-      "/N": clearCurrentDocument,
-      "HELP": showHelp
-    };
-
-    const action = actions[command];
-    if (action) action();
-    else {
-      notify(`Transaction ${command} does not exist`, "error");
-      input?.focus();
-      input?.select();
-    }
-  }
-
-  function nextSuggestion() {
-    showDocuments();
-    if (workspace?.hidden) {
-      chooseFileButton?.click();
+  function refreshSelection() {
+    if (!hasWorkbook()) {
+      notify("No workbook loaded");
       return;
     }
-    poSearch?.dispatchEvent(new Event("input", { bubbles: true }));
-    window.requestAnimationFrame(() => {
-      const first = $("#suggestions .suggestion-button");
-      if (first) {
-        first.focus();
-        notify("First matching purchase order selected");
-      } else {
-        focusSearch(true);
-        notify("No matching suggestion available", "warning");
-      }
-    });
-  }
-
-  function openNewSession() {
-    window.open(window.location.href, "_blank", "noopener,noreferrer");
-    notify("New local session opened");
-  }
-
-  function refreshApplication() {
-    notify("Refreshing application");
-    window.setTimeout(() => window.location.reload(), 120);
-  }
-
-  function exitApplication() {
-    if (window.confirm("Exit PO Query and clear the local workbook session?")) {
-      window.location.reload();
+    if (poSearch.value.trim()) {
+      searchForm.requestSubmit();
+      notify("Document refreshed");
+    } else {
+      poSearch.focus();
+      notify("Enter a purchase order number");
     }
   }
 
-  function parseNumericCell(text) {
-    let value = String(text || "").replace(/\s+/g, " ").trim().replace(/[^0-9,.-]/g, "");
-    if (!value) return 0;
-    const comma = value.lastIndexOf(",");
-    const dot = value.lastIndexOf(".");
-    if (comma >= 0 && dot >= 0) {
-      value = comma > dot ? value.replace(/\./g, "").replace(",", ".") : value.replace(/,/g, "");
-    } else if (comma >= 0) {
-      const digits = value.length - comma - 1;
-      value = digits > 0 && digits <= 2 ? value.replace(",", ".") : value.replace(/,/g, "");
-    } else if (dot >= 0) {
-      const digits = value.length - dot - 1;
-      if (digits === 3) value = value.replace(/\./g, "");
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function summaryMap() {
+    const result = new Map();
+    for (const card of summaryGrid?.querySelectorAll(".summary-card") || []) {
+      const label = card.querySelector("span")?.textContent?.trim().toLowerCase();
+      const value = card.querySelector("strong")?.textContent?.trim();
+      if (label) result.set(label, value || "—");
     }
-    const parsed = Number(value);
+    return result;
+  }
+
+  function headerIndex(label) {
+    const normalized = label.trim().toLowerCase();
+    return [...table.tHead.rows[0].cells].findIndex(
+      (cell) => cell.textContent.trim().toLowerCase() === normalized
+    );
+  }
+
+  function parseAmount(value) {
+    const text = String(value ?? "").trim().replace(/\s/g, "");
+    if (!text) return 0;
+    const cleaned = text.replace(/[^0-9,.-]/g, "");
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+    let numeric = cleaned;
+
+    if (lastComma >= 0 && lastDot >= 0) {
+      numeric = lastComma > lastDot
+        ? cleaned.replace(/\./g, "").replace(",", ".")
+        : cleaned.replace(/,/g, "");
+    } else if (lastComma >= 0) {
+      const decimals = cleaned.length - lastComma - 1;
+      numeric = decimals > 0 && decimals <= 2
+        ? cleaned.replace(",", ".")
+        : cleaned.replace(/,/g, "");
+    } else if (lastDot >= 0) {
+      const decimals = cleaned.length - lastDot - 1;
+      if (decimals === 3 && cleaned.split(".").length > 1) numeric = cleaned.replace(/\./g, "");
+    }
+
+    const parsed = Number(numeric);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
+  function detectCurrency(...values) {
+    for (const value of values) {
+      const match = String(value ?? "").trim().match(/^([^0-9-]+?)\s*(?=\d)/);
+      if (match) return match[1].trim();
+    }
+    return "";
+  }
+
+  function formatAmount(value, currency = "") {
+    const amount = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(value);
+    return currency ? `${currency} ${amount}` : amount;
+  }
+
   function visibleRows() {
-    return [...(itemsTableBody?.rows || [])].filter((row) => !row.hidden);
+    return [...tableBody.rows].filter((row) => !row.hidden);
+  }
+
+  function buildPrintSheet() {
+    if (!hasSelectedPo()) {
+      notify("Select a purchase order before printing");
+      return null;
+    }
+
+    document.getElementById("purchaseOrderPrintSheet")?.remove();
+
+    const summary = summaryMap();
+    const headers = {
+      item: headerIndex("Item"),
+      description: headerIndex("Description"),
+      quantity: headerIndex("Quantity"),
+      unitPrice: headerIndex("Unit price"),
+      netValue: headerIndex("Net value")
+    };
+    const rows = [...tableBody.rows];
+    const supplierText = resultSupplier?.textContent?.trim() || "—";
+    const supplierParts = supplierText.split(" · ");
+    const supplierName = supplierParts[0] || "—";
+    const supplierCode = supplierParts.slice(1).join(" · ") || "—";
+    const poNumber = resultPoNumber?.textContent?.trim() || "—";
+    const poDate = summary.get("po date") || "—";
+    const paymentTerms = summary.get("top / payment terms") || "—";
+    const createdBy = summary.get("created by") || "—";
+    const poValueText = summary.get("po value") || "—";
+
+    let subtotal = 0;
+    const itemRows = rows.map((row, index) => {
+      const cells = row.cells;
+      const itemCode = headers.item >= 0 ? cells[headers.item]?.textContent?.trim() : "";
+      const description = headers.description >= 0 ? cells[headers.description]?.textContent?.trim() : "";
+      const quantity = headers.quantity >= 0 ? cells[headers.quantity]?.textContent?.trim() : "";
+      const unitPrice = headers.unitPrice >= 0 ? cells[headers.unitPrice]?.textContent?.trim() : "";
+      const netValue = headers.netValue >= 0 ? cells[headers.netValue]?.textContent?.trim() : "";
+      subtotal += parseAmount(netValue);
+
+      return `
+        <tr>
+          <td class="po-print-center">${index + 1}</td>
+          <td>${escapeHtml(itemCode || "—")}</td>
+          <td>${escapeHtml(description || "—")}</td>
+          <td class="po-print-number">${escapeHtml(quantity || "—")}</td>
+          <td class="po-print-center">—</td>
+          <td class="po-print-number">${escapeHtml(unitPrice || "—")}</td>
+          <td class="po-print-number">${escapeHtml(netValue || "—")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const firstUnitPrice = headers.unitPrice >= 0 ? rows[0]?.cells[headers.unitPrice]?.textContent : "";
+    const firstNetValue = headers.netValue >= 0 ? rows[0]?.cells[headers.netValue]?.textContent : "";
+    const currency = detectCurrency(firstUnitPrice, firstNetValue, poValueText);
+    const totalAmount = parseAmount(poValueText);
+    const difference = totalAmount && subtotal ? totalAmount - subtotal : 0;
+    const differenceText = Math.abs(difference) > 0.005 ? formatAmount(difference, currency) : "—";
+    const totalDisplay = poValueText !== "—"
+      ? poValueText
+      : formatAmount(subtotal + difference, currency);
+
+    const sheet = document.createElement("section");
+    sheet.id = "purchaseOrderPrintSheet";
+    sheet.setAttribute("aria-hidden", "true");
+    sheet.innerHTML = `
+      <div class="po-print-page">
+        <header class="po-print-header">
+          <div class="po-print-supplier">
+            <div class="po-print-small-line"><strong>Supplier Code:</strong> ${escapeHtml(supplierCode)}</div>
+            <h1>${escapeHtml(supplierName)}</h1>
+            <div class="po-print-address">Address: —</div>
+            <div>Indonesia</div>
+            <div class="po-print-contact-grid">
+              <strong>ATTN</strong><span>:</span><span>—</span>
+              <strong>Tel. No</strong><span>:</span><span>—</span>
+              <strong>Fax No</strong><span>:</span><span>—</span>
+            </div>
+          </div>
+          <div class="po-print-brand">
+            <div class="po-print-logo"><span>KSB</span><i></i></div>
+            <div class="po-print-meta">
+              <strong>Purchase Order No.</strong><span>:</span><b>ID- ${escapeHtml(poNumber)}</b>
+              <strong>Date</strong><span>:</span><span>${escapeHtml(poDate)}</span>
+              <strong>Our Job No.</strong><span>:</span><span>—</span>
+              <strong>Other</strong><span>:</span><span>Created by ${escapeHtml(createdBy)}</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="po-print-reference">
+          <div><strong>Your Quotation No.</strong><span>:</span><span>—</span></div>
+          <div><strong>Dated</strong><span>:</span><span>—</span></div>
+        </section>
+
+        <p class="po-print-intro">We are pleased to place an order with you for the following goods and the terms and conditions set forth below:</p>
+
+        <table class="po-print-items">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Item Number</th>
+              <th>Description</th>
+              <th>Qty.</th>
+              <th>UoM</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+
+        <section class="po-print-totals">
+          <div><strong>Sub Total</strong><span>${escapeHtml(formatAmount(subtotal, currency))}</span></div>
+          <div><strong>VAT / Tax</strong><span>${escapeHtml(differenceText)}</span></div>
+          <div class="grand-total"><strong>Total Amount</strong><span>${escapeHtml(totalDisplay)}</span></div>
+        </section>
+
+        <section class="po-print-terms">
+          <div><strong>PRICES</strong><span>:</span><span>${escapeHtml(currency || "As stated above")}, Franco KSB Indonesia Cibitung</span></div>
+          <div><strong>DELIVERY</strong><span>:</span><span>—</span></div>
+          <div><strong>PAYMENT</strong><span>:</span><span>${escapeHtml(paymentTerms)}</span></div>
+          <div><strong>DESPATCH MODE</strong><span>:</span><span>—</span></div>
+        </section>
+
+        <section class="po-print-instructions">
+          <strong>SPECIAL INSTRUCTIONS: Refer attached / To be advised</strong>
+          <ul>
+            <li>Kindly acknowledge receipt of this purchase order and return the confirmation to the purchaser.</li>
+            <li>Please state the purchase order number on the delivery note and invoice.</li>
+            <li>Attach a copy of the purchase order to the delivery documentation where required.</li>
+            <li>Delivery, receiving hours, warranty, and supplier terms remain subject to the agreed commercial conditions.</li>
+          </ul>
+        </section>
+      </div>
+    `;
+    document.body.appendChild(sheet);
+    return sheet;
+  }
+
+  function installPrintStyle() {
+    if (document.getElementById("purchase-order-print-style")) return;
+    const style = document.createElement("style");
+    style.id = "purchase-order-print-style";
+    style.textContent = `
+      #purchaseOrderPrintSheet { display: none; }
+      @page { size: A4 portrait; margin: 10mm 11mm; }
+      @media print {
+        html, body { background: #fff !important; }
+        body > .page-shell, body > .toast { display: none !important; }
+        #purchaseOrderPrintSheet {
+          display: block !important;
+          color: #111;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9pt;
+          line-height: 1.25;
+        }
+        .po-print-page { width: 100%; }
+        .po-print-header {
+          display: grid;
+          grid-template-columns: 1.08fr .92fr;
+          gap: 16mm;
+          min-height: 45mm;
+        }
+        .po-print-supplier h1 { margin: 5px 0 2px; font-size: 12pt; text-transform: uppercase; }
+        .po-print-small-line { font-size: 8pt; }
+        .po-print-address { margin-top: 2px; }
+        .po-print-contact-grid, .po-print-meta {
+          margin-top: 6px;
+          display: grid;
+          grid-template-columns: max-content 8px 1fr;
+          gap: 1px 5px;
+        }
+        .po-print-brand { display: grid; align-content: start; gap: 9mm; }
+        .po-print-logo {
+          justify-self: end;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 22pt;
+          font-weight: 900;
+          letter-spacing: -1px;
+        }
+        .po-print-logo i {
+          width: 24px;
+          height: 24px;
+          display: block;
+          border: 6px solid #222;
+          border-radius: 3px;
+          transform: rotate(45deg);
+        }
+        .po-print-reference {
+          width: 58%;
+          margin: 5mm 0 3mm;
+          display: grid;
+          gap: 3px;
+        }
+        .po-print-reference > div, .po-print-terms > div {
+          display: grid;
+          grid-template-columns: 42mm 5mm 1fr;
+        }
+        .po-print-intro { margin: 0 0 3mm; }
+        .po-print-items {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+        }
+        .po-print-items th {
+          padding: 2mm 1.5mm;
+          border-top: 1px solid #111;
+          border-bottom: 1px solid #111;
+          text-align: left;
+          font-weight: 700;
+        }
+        .po-print-items td {
+          padding: 2mm 1.5mm;
+          vertical-align: top;
+          border: 0;
+        }
+        .po-print-items th:nth-child(1) { width: 8%; }
+        .po-print-items th:nth-child(2) { width: 18%; }
+        .po-print-items th:nth-child(3) { width: 32%; }
+        .po-print-items th:nth-child(4) { width: 8%; }
+        .po-print-items th:nth-child(5) { width: 8%; }
+        .po-print-items th:nth-child(6) { width: 13%; }
+        .po-print-items th:nth-child(7) { width: 13%; }
+        .po-print-center { text-align: center; }
+        .po-print-number { text-align: right; font-variant-numeric: tabular-nums; }
+        .po-print-totals {
+          width: 43%;
+          margin: 4mm 0 5mm auto;
+          display: grid;
+          gap: 0;
+        }
+        .po-print-totals > div {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8mm;
+          padding: 2.5mm 0;
+          border-bottom: 1px solid #111;
+        }
+        .po-print-totals span { text-align: right; font-variant-numeric: tabular-nums; }
+        .po-print-totals .grand-total { border-bottom: 3px double #111; }
+        .po-print-terms { display: grid; gap: 2px; margin-top: 4mm; }
+        .po-print-instructions { margin-top: 4mm; }
+        .po-print-instructions ul { margin: 2mm 0 0 5mm; padding: 0; }
+        .po-print-instructions li { margin: 1px 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function printPurchaseOrder() {
+    installPrintStyle();
+    const sheet = buildPrintSheet();
+    if (!sheet) return;
+    notify("Opening purchase order print preview");
+    window.setTimeout(() => window.print(), 0);
+  }
+
+  function exportCsvViaOutput() {
+    showOutput();
+    window.setTimeout(() => {
+      const exportButton = document.getElementById("outputCsvButton");
+      if (exportButton && !exportButton.disabled) {
+        exportButton.click();
+      } else {
+        notify("Select a purchase order before exporting");
+      }
+    }, 0);
   }
 
   function sortRows() {
-    if (!itemsTableBody || !itemsTableBody.rows.length) {
-      notify("Select a purchase order first", "warning");
+    const rows = [...tableBody.rows];
+    if (rows.length < 2) {
+      notify("No item rows to sort");
       return;
     }
-    const rows = [...itemsTableBody.rows];
+    const ascending = tableBody.dataset.sortDirection !== "asc";
     rows.sort((a, b) => {
       const left = a.cells[0]?.textContent?.trim() || "";
       const right = b.cells[0]?.textContent?.trim() || "";
-      return left.localeCompare(right, undefined, { numeric: true }) * (sortAscending ? 1 : -1);
+      return left.localeCompare(right, undefined, { numeric: true }) * (ascending ? 1 : -1);
     });
     const fragment = document.createDocumentFragment();
     rows.forEach((row) => fragment.appendChild(row));
-    itemsTableBody.appendChild(fragment);
-    notify(`Items sorted ${sortAscending ? "ascending" : "descending"}`);
-    sortAscending = !sortAscending;
+    tableBody.appendChild(fragment);
+    tableBody.dataset.sortDirection = ascending ? "asc" : "desc";
+    notify(`Items sorted ${ascending ? "ascending" : "descending"}`);
   }
 
   function filterRows() {
-    if (!itemsTableBody || !itemsTableBody.rows.length) {
-      notify("Select a purchase order first", "warning");
-      return;
-    }
-    const query = window.prompt("Filter item grid by item, description, GR, status, or date:", activeFilter);
-    if (query === null) return;
-    activeFilter = query.trim().toLowerCase();
+    const previous = tableBody.dataset.filterTerm || "";
+    const term = window.prompt("Filter item rows by item, description, GR, status, or timeline:", previous);
+    if (term === null) return;
+    const normalized = term.trim().toLowerCase();
+    tableBody.dataset.filterTerm = normalized;
     let visible = 0;
-    for (const row of itemsTableBody.rows) {
-      row.hidden = Boolean(activeFilter) && !row.textContent.toLowerCase().includes(activeFilter);
-      if (!row.hidden) visible += 1;
+    for (const row of tableBody.rows) {
+      const matches = !normalized || row.textContent.toLowerCase().includes(normalized);
+      row.hidden = !matches;
+      if (matches) visible += 1;
     }
-    $("#alvFilterButton").textContent = activeFilter ? `Filter (${visible})` : "Filter";
-    notify(activeFilter ? `${visible} item rows match the filter` : "Item filter cleared");
+    if (subtotalLine) subtotalLine.hidden = true;
+    notify(normalized ? `${visible} item row${visible === 1 ? "" : "s"} matched` : "Item filter cleared");
   }
 
-  function calculateSubtotal() {
-    const rows = visibleRows();
-    if (!rows.length) {
-      notify("No visible item rows to subtotal", "warning");
+  function showSubtotal() {
+    const netIndex = headerIndex("Net value");
+    if (netIndex < 0) {
+      notify("Net value column not found");
       return;
     }
-    let quantity = 0;
-    let netValue = 0;
+    let subtotal = 0;
     let currency = "";
+    const rows = visibleRows();
     for (const row of rows) {
-      quantity += parseNumericCell(row.cells[2]?.textContent);
-      netValue += parseNumericCell(row.cells[4]?.textContent);
-      if (!currency) {
-        currency = (row.cells[4]?.textContent?.match(/^[A-Za-z]{3}/)?.[0] || "").toUpperCase();
-      }
+      const text = row.cells[netIndex]?.textContent?.trim() || "";
+      subtotal += parseAmount(text);
+      currency ||= detectCurrency(text);
     }
-    const formattedQuantity = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(quantity);
-    const formattedValue = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(netValue);
     if (subtotalLine) {
-      subtotalLine.textContent = `Visible lines: ${rows.length}    Quantity: ${formattedQuantity}    Net value: ${currency ? `${currency} ` : ""}${formattedValue}`;
+      subtotalLine.textContent = `Visible subtotal (${rows.length} item${rows.length === 1 ? "" : "s"}): ${formatAmount(subtotal, currency)}`;
       subtotalLine.hidden = false;
     }
-    notify(`Subtotal calculated for ${rows.length} lines`);
+    notify("Visible subtotal calculated");
   }
 
   function toggleLayout() {
-    const toggle = $("#compactGridToggle");
-    if (toggle) {
-      toggle.checked = !toggle.checked;
-      toggle.dispatchEvent(new Event("change", { bubbles: true }));
-      $("#alvLayoutButton").textContent = toggle.checked ? "Layout: Compact" : "Layout";
-      notify(toggle.checked ? "Compact ALV layout enabled" : "Standard ALV layout enabled");
-      return;
-    }
     document.body.classList.toggle("compact-grid");
+    const compactToggle = document.getElementById("compactGridToggle");
+    if (compactToggle) compactToggle.checked = document.body.classList.contains("compact-grid");
     notify(document.body.classList.contains("compact-grid") ? "Compact ALV layout enabled" : "Standard ALV layout enabled");
   }
 
-  function scrollGrid(toBottom) {
-    if (!tableWrap || !itemsTableBody?.rows.length) {
-      notify("Select a purchase order first", "warning");
-      return;
-    }
+  function scrollGrid(position) {
+    if (!tableWrap) return;
     tableWrap.scrollTo({
-      top: toBottom ? tableWrap.scrollHeight : 0,
+      top: position === "top" ? 0 : tableWrap.scrollHeight,
       behavior: document.documentElement.classList.contains("performance-mode") ? "auto" : "smooth"
     });
-    notify(toBottom ? "Moved to last item" : "Moved to first item");
+    notify(position === "top" ? "First item row" : "Last item row");
   }
 
-  $$(".sap-menu [data-menu-action]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = button.dataset.menuAction;
-      if (action === "documents") showDocuments();
-      else if (action === "edit") focusSearch(true);
-      else if (action === "goto") gotoDocument();
-      else if (action === "environment") showTechnicalInfo();
-      else if (action === "system") showTab(1);
-      else if (action === "help") showHelp();
-    });
-  });
+  function cycleSuggestion() {
+    const options = [...(suggestions?.querySelectorAll("[data-po]") || [])];
+    if (!options.length) {
+      poSearch.focus();
+      notify("Start typing to find purchase orders");
+      return;
+    }
+    const current = Number(suggestions.dataset.activeIndex || -1);
+    const next = (current + 1) % options.length;
+    suggestions.dataset.activeIndex = String(next);
+    options[next].focus();
+    options[next].scrollIntoView({ block: "nearest" });
+  }
 
-  $("#commandExecuteButton")?.addEventListener("click", executeCommand);
-  $("#commandInput")?.addEventListener("keydown", (event) => {
+  function executeCommand() {
+    const input = document.getElementById("commandInput");
+    const command = input?.value?.trim().toUpperCase() || "";
+    const normalized = command.replace(/\s+/g, "");
+
+    if (!normalized || normalized === "ZPOQUERY" || normalized === "/NZPOQUERY") {
+      showDocuments();
+      focusSearch();
+      return;
+    }
+    if (normalized === "/N" || normalized === "/NEND") {
+      clearSelection();
+      showDocuments();
+      return;
+    }
+    if (normalized === "/O" || normalized === "/OZPOQUERY") {
+      window.open(window.location.href, "_blank", "noopener");
+      notify("New session opened");
+      return;
+    }
+    if (normalized === "CONTROL") {
+      showControl();
+      return;
+    }
+    if (normalized === "OUTPUT") {
+      showOutput();
+      return;
+    }
+    notify(`Transaction ${command} is not available`);
+  }
+
+  button("commandExecuteButton")?.addEventListener("click", executeCommand);
+  button("commandInput")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") executeCommand();
   });
-  $("#commandHistoryButton")?.addEventListener("click", showHelp);
-  $("#toolbarSaveButton")?.addEventListener("click", exportCurrentDocument);
-  $("#toolbarBackButton")?.addEventListener("click", () => { showDocuments(); window.scrollTo({ top: 0, behavior: "smooth" }); notify("Back to Documents"); });
-  $("#toolbarExitButton")?.addEventListener("click", exitApplication);
-  $("#toolbarCancelButton")?.addEventListener("click", clearCurrentDocument);
-  $("#toolbarPrintButton")?.addEventListener("click", printCurrentDocument);
-  $("#toolbarFindButton")?.addEventListener("click", () => focusSearch(true));
-  $("#toolbarFindNextButton")?.addEventListener("click", nextSuggestion);
-  $("#toolbarNewSessionButton")?.addEventListener("click", openNewSession);
-  $("#toolbarRefreshButton")?.addEventListener("click", refreshApplication);
+  button("commandHistoryButton")?.addEventListener("click", () => {
+    notify("Available: ZPOQUERY, CONTROL, OUTPUT, /N, /O");
+    button("commandInput")?.focus();
+  });
 
-  $$('[data-app-action]').forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = button.dataset.appAction;
-      if (action === "select-file") chooseFileButton?.click();
-      else if (action === "execute") executeSearch();
-      else if (action === "technical") showTechnicalInfo();
-      else if (action === "control") showTab(1);
+  button("toolbarSaveButton")?.addEventListener("click", exportCsvViaOutput);
+  button("toolbarBackButton")?.addEventListener("click", () => {
+    if (documentTabs[0]?.getAttribute("aria-selected") !== "true") showDocuments();
+    else if (hasSelectedPo()) clearSelection();
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  button("toolbarExitButton")?.addEventListener("click", () => {
+    clearSelection();
+    showDocuments();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    notify("Returned to initial screen");
+  });
+  button("toolbarCancelButton")?.addEventListener("click", clearSelection);
+  button("toolbarFindButton")?.addEventListener("click", focusSearch);
+  button("toolbarFindNextButton")?.addEventListener("click", cycleSuggestion);
+  button("toolbarNewSessionButton")?.addEventListener("click", () => {
+    window.open(window.location.href, "_blank", "noopener");
+    notify("New session opened");
+  });
+  button("toolbarRefreshButton")?.addEventListener("click", refreshSelection);
+
+  document.querySelector('[data-app-action="select-file"]')?.addEventListener("click", () => fileInput.click());
+  document.querySelector('[data-app-action="execute"]')?.addEventListener("click", executeSearch);
+  document.querySelector('[data-app-action="technical"]')?.addEventListener("click", () => {
+    showDocuments();
+    if (detectedDetails) detectedDetails.open = true;
+    document.getElementById("detectedColumnsSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    notify("Technical information displayed");
+  });
+  document.querySelector('[data-app-action="control"]')?.addEventListener("click", showControl);
+
+  document.querySelectorAll("[data-menu-action]").forEach((menuButton) => {
+    menuButton.addEventListener("click", () => {
+      const action = menuButton.dataset.menuAction;
+      if (action === "documents") showDocuments();
+      else if (action === "edit") focusSearch();
+      else if (action === "goto") {
+        if (detectedDetails) detectedDetails.open = true;
+        document.getElementById("detectedColumnsSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (action === "environment") showControl();
+      else if (action === "system") notify("System: LOCAL / Client 100 / Browser session");
+      else if (action === "help") notify("F8 Execute · F3 Back · Ctrl+P Print · /O New session");
     });
   });
 
-  $("#alvSortButton")?.addEventListener("click", sortRows);
-  $("#alvFilterButton")?.addEventListener("click", filterRows);
-  $("#alvSubtotalButton")?.addEventListener("click", calculateSubtotal);
-  $("#alvLayoutButton")?.addEventListener("click", toggleLayout);
-  $("#alvTopButton")?.addEventListener("click", () => scrollGrid(false));
-  $("#alvBottomButton")?.addEventListener("click", () => scrollGrid(true));
-
-  chooseFileButton?.addEventListener("click", () => setStatus("Select a workbook"));
-  searchForm?.addEventListener("submit", () => setStatus("Purchase order search executed"));
-  $("#copySummaryButton")?.addEventListener("click", () => setStatus("Purchase order summary copied"));
-  $("#printButton")?.addEventListener("click", () => setStatus("Print dialog opened"));
+  button("alvSortButton")?.addEventListener("click", sortRows);
+  button("alvFilterButton")?.addEventListener("click", filterRows);
+  button("alvSubtotalButton")?.addEventListener("click", showSubtotal);
+  button("alvLayoutButton")?.addEventListener("click", toggleLayout);
+  button("alvTopButton")?.addEventListener("click", () => scrollGrid("top"));
+  button("alvBottomButton")?.addEventListener("click", () => scrollGrid("bottom"));
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "F8") {
@@ -408,21 +635,21 @@
       executeSearch();
     } else if (event.key === "F3") {
       event.preventDefault();
-      showDocuments();
-      notify("Back to Documents");
-    } else if (event.key === "Escape" && !$("#sapHelpDialog")?.open) {
-      clearCurrentDocument();
+      button("toolbarBackButton")?.click();
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
-      if (hasSelectedPo()) {
-        event.preventDefault();
-        printCurrentDocument();
-      }
+      event.preventDefault();
+      printPurchaseOrder();
     }
   });
 
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => setStatus(`${tab.textContent.trim()} tab active`));
-  });
+  document.addEventListener("click", (event) => {
+    const printControl = event.target.closest("#printButton, #toolbarPrintButton, #outputPrintButton");
+    if (!printControl) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    printPurchaseOrder();
+  }, true);
 
-  setStatus("Ready — transaction ZPOQUERY");
+  installPrintStyle();
+  notify("Ready");
 })();
