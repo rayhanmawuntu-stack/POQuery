@@ -40,6 +40,8 @@ jobs:
           cat source-panel.js >> _site/item-timeline.js
           printf '\n' >> _site/item-timeline.js
           cat print-logo.js >> _site/item-timeline.js
+          printf '\n' >> _site/item-timeline.js
+          cat item-description-search.js >> _site/item-timeline.js
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
