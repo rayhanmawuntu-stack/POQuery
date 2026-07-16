@@ -33,7 +33,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js gr-date.js item-timeline.js _site/
+          cp index.html styles.css app.js gr-date.js item-timeline.js sap-controls.js _site/
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
