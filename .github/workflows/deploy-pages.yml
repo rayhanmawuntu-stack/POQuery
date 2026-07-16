@@ -34,6 +34,8 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html styles.css app.js gr-date.js item-timeline.js sap-controls.js _site/
+          printf '\n' >> _site/item-timeline.js
+          cat description-copy.js >> _site/item-timeline.js
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
