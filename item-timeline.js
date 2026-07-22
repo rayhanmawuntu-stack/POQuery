@@ -53,6 +53,39 @@
     .timeline-event.cancelled .timeline-dot { border-color: #8d0000; background: #ffcaca; }
     .timeline-event.return .timeline-dot { border-color: #9a5200; background: #ffe5b8; }
     .timeline-event.open .timeline-dot { border-color: #8d6b00; background: #fff0a6; }
+    .timeline-legend {
+      min-height: 29px;
+      padding: 4px 7px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px 12px;
+      border-bottom: 1px solid #85857f;
+      background: #f1f0e8;
+      color: #333;
+      font-size: 9px;
+    }
+    .timeline-legend-title { color: #123e5d; font-weight: 700; }
+    .timeline-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .timeline-legend-dot {
+      width: 7px;
+      height: 7px;
+      flex: 0 0 auto;
+      border: 1px solid #174b6b;
+      border-radius: 50%;
+      background: #d7eaf7;
+    }
+    .timeline-legend-dot.gr { border-color: #256f3a; background: #dff2df; }
+    .timeline-legend-dot.cancelled { border-color: #8d0000; background: #ffcaca; }
+    .timeline-legend-dot.return { border-color: #9a5200; background: #ffe5b8; }
+    .timeline-legend-dot.open { border-color: #8d6b00; background: #fff0a6; }
+    .timeline-legend-item.cancelled { color: #8d0000; text-decoration: line-through; opacity: .78; }
+    .hide-item-timeline .timeline-legend,
     .hide-item-timeline [data-column="item-timeline"],
     .hide-item-timeline .item-timeline-cell { display: none !important; }
     .hide-cancelled-gr .timeline-event.cancelled,
@@ -325,6 +358,25 @@
   observer.observe(tableBody, { childList: true, subtree: true });
   scheduleTimelineRender();
 
+  function installTimelineLegend() {
+    const toolbar = table.closest(".items-section")?.querySelector(".alv-toolbar");
+    if (!toolbar || document.getElementById("itemTimelineLegend")) return;
+
+    const legend = document.createElement("div");
+    legend.id = "itemTimelineLegend";
+    legend.className = "timeline-legend";
+    legend.setAttribute("aria-label", "Item timeline legend");
+    legend.innerHTML = `
+      <strong class="timeline-legend-title">Legend:</strong>
+      <span class="timeline-legend-item"><span class="timeline-legend-dot" aria-hidden="true"></span>PO</span>
+      <span class="timeline-legend-item"><span class="timeline-legend-dot gr" aria-hidden="true"></span>Active GR</span>
+      <span class="timeline-legend-item cancelled"><span class="timeline-legend-dot cancelled" aria-hidden="true"></span>Cancelled GR</span>
+      <span class="timeline-legend-item"><span class="timeline-legend-dot return" aria-hidden="true"></span>Goods return</span>
+      <span class="timeline-legend-item"><span class="timeline-legend-dot open" aria-hidden="true"></span>Awaiting GR</span>
+    `;
+    toolbar.insertAdjacentElement("afterend", legend);
+  }
+
   function installTimelineControl() {
     const controlOptions = document.querySelector("#controlTabPanel .control-options");
     if (!controlOptions || controlOptions.querySelector("#showItemTimelineToggle")) return;
@@ -352,5 +404,6 @@
   }
 
   installSmoothGridScrolling();
+  installTimelineLegend();
   installTimelineControl();
 })();
