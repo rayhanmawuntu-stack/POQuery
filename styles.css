@@ -567,6 +567,18 @@ input:focus-visible,
 .search-form { grid-template-columns: 180px minmax(260px, 500px) 110px; }
 .search-input-wrap { position: relative; }
 
+#poSearch::-webkit-search-cancel-button,
+#poSearch::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#poSearch::-ms-clear {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .clear-button {
   position: absolute;
   top: 2px;
