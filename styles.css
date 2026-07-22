@@ -867,7 +867,20 @@ tbody tr:hover { background: #fff2a4; }
 
 .gr-list {
   display: grid;
+  grid-auto-rows: 19px;
+  align-items: center;
   gap: 2px;
+}
+
+.gr-list > .gr-chip,
+.gr-list > .gr-copy-entry {
+  min-height: 19px;
+}
+
+.gr-list > .gr-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
 }
 
 .gr-chip {
