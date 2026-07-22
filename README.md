@@ -12,6 +12,7 @@ A fast, browser-based purchase order lookup tool. Import an Excel report and sea
 - Automatically detects common column-name variations.
 - Responsive layout for desktop and mobile.
 - Printable result view and copyable PO summary.
+- Copies Description, PO Number, and GR Number as adjacent Excel columns.
 - Automatically deploys to GitHub Pages through GitHub Actions after updates to `main`.
 
 ## Expected columns
