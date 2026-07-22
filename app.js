@@ -83,6 +83,7 @@
     itemsTableBody: document.getElementById("itemsTableBody"),
     detectedColumns: document.getElementById("detectedColumns"),
     copySummaryButton: document.getElementById("copySummaryButton"),
+    copyExcelButton: document.getElementById("copyExcelButton"),
     printButton: document.getElementById("printButton"),
     toast: document.getElementById("toast")
   };
@@ -526,6 +527,53 @@
     return lines.join("\n");
   }
 
+  function sanitizeExcelCell(value) {
+    return String(value ?? "")
+      .replace(/[\t\r\n]+/g, " ")
+      .trim();
+  }
+
+  function buildExcelText() {
+    if (!state.currentPo) return { text: "", rowCount: 0 };
+
+    const rows = state.poIndex.get(state.currentPo) || [];
+    const excelRows = [];
+
+    buildLineItems(rows).forEach((item) => {
+      const grNumbers = item.receipts.length
+        ? item.receipts.map((receipt) => receipt.number)
+        : [""];
+
+      grNumbers.forEach((grNumber) => {
+        excelRows.push([
+          sanitizeExcelCell(item.description),
+          sanitizeExcelCell(state.currentPo),
+          sanitizeExcelCell(grNumber)
+        ].join("\t"));
+      });
+    });
+
+    return { text: excelRows.join("\n"), rowCount: excelRows.length };
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) throw new Error("Copy command was unavailable");
+  }
+
   el.chooseFileButton.addEventListener("click", () => el.fileInput.click());
   el.changeFileButton.addEventListener("click", () => el.fileInput.click());
   el.fileInput.addEventListener("change", (event) => importFile(event.target.files?.[0]));
@@ -589,16 +637,23 @@
     const text = buildSummaryText();
     if (!text) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       showToast("PO summary copied");
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
-      showToast("PO summary copied");
+    } catch (error) {
+      console.error(error);
+      showToast("Unable to copy PO summary");
+    }
+  });
+
+  el.copyExcelButton.addEventListener("click", async () => {
+    const { text, rowCount } = buildExcelText();
+    if (!text) return;
+    try {
+      await copyText(text);
+      showToast(`${rowCount} Excel row${rowCount === 1 ? "" : "s"} copied`);
+    } catch (error) {
+      console.error(error);
+      showToast("Unable to copy Excel rows");
     }
   });
 
